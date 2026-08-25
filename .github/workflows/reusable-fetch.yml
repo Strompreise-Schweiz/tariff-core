@@ -1,0 +1,47 @@
+name: Reusable fetch tariffs
+
+on:
+  workflow_call:
+    inputs:
+      engine-ref:
+        description: "Ref of tariff-etl to use for the engine script"
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@v4
+
+      - name: Checkout tariff-etl engine
+        uses: actions/checkout@v4
+        with:
+          repository: Strompreise-Schweiz/tariff-etl
+          ref: ${{ inputs.engine-ref }}
+          path: _engine
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch and normalize tariffs
+        run: python3 _engine/engine/fetch_and_normalize.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "data: tariff snapshot $(date -u +%Y-%m-%d)"
+            git push
+          fi
