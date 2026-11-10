@@ -62,6 +62,7 @@ both; the second run changes nothing.
 ## Other behaviour
 
 - GitHub disables scheduled workflows in a public repo after 60 days without repository activity.
-  Repos with dynamic tariffs commit daily. Repos with static tariffs only can be disabled. The GitHub
+  Repos with dynamic tariffs commit daily. Utilities with constant and multilevel tariffs only live in
+  the hub repo, which stays active as long as any of them changes. If it is ever disabled, the GitHub
   notification and the "Enable workflow" button handle that case.
 - Runs in one repo do not overlap, because the workflow sets `concurrency`.

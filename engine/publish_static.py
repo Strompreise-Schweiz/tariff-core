@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Static tariffs: fetch, repair, apply curation, validate, publish.
 
-Run from the root of an org repo.
+Run from the root of an org repo, or of the hub repo to publish every utility in it.
 
     source (url or file) -> data/static/raw/<name>.json   byte-exact
                          -> repairs in normalizers/static_vse.py
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import SCHEMA_BASE, annotate, fetch_bytes, load_config, load_json, now_utc, slugify, write_bytes, write_json, ZURICH  # noqa: E402
+from common import SCHEMA_BASE, annotate, fetch_bytes, load_config, load_json, now_utc, org_roots, slugify, write_bytes, write_json, ZURICH  # noqa: E402
 from normalizers import static_vse  # noqa: E402
 from site_index import write_index  # noqa: E402
 from validate import apply_waivers, document_issues, report  # noqa: E402
@@ -188,7 +188,14 @@ def publish(root: Path, offline: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="rebuild from data/static/raw without fetching")
-    return publish(Path.cwd(), offline=parser.parse_args().offline)
+    offline = parser.parse_args().offline
+    roots = org_roots(Path.cwd())
+    if not roots:
+        annotate("error", "no config/source.json here and no utilities/<slug>/config/source.json")
+        return 1
+    # Publish every utility, also after a failure: one broken source must not block the others.
+    results = [publish(root, offline=offline) for root in roots]
+    return 1 if any(results) else 0
 
 
 if __name__ == "__main__":

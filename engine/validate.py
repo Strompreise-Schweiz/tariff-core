@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Validates an org repo: schema checks plus the rules JSON Schema cannot express.
+"""Validates an org repo or the hub repo: schema checks plus the rules JSON Schema cannot express.
 
-Run from the root of an org repo. Issue codes are stable, so curation/<year>.json
+Run from the root of the repo. Issue codes are stable, so curation/<year>.json
 can accept a specific one with a reason. Requires jsonschema.
 """
 import argparse
@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ENGINE_ROOT, annotate, dynamic_dir, load_json  # noqa: E402
+from common import ENGINE_ROOT, annotate, dynamic_dir, in_hub, load_json, org_roots  # noqa: E402
 from normalizers import generic_vse  # noqa: E402
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -183,20 +183,32 @@ def dynamic_day_issues(path: Path, document: dict) -> list[dict]:
     return issues
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--all-days", action="store_true", help="check the whole dynamic archive, not only the newest days")
-    args = parser.parse_args()
-    root = Path.cwd()
+def hub_issues(root: Path, config: dict) -> list[dict]:
+    """Rules for a utility in the hub repo. Dynamic tariffs commit every day and grow the
+    archive, so they belong in an own repo. The folder name is part of the public URL."""
+    issues = []
+    if any(t.get("enabled", True) for t in config.get("dynamic", [])):
+        issues.append(_issue("error", "dynamic_in_hub", None, "a utility with dynamic tariffs needs its own repo"))
+    if config.get("slug") != root.name:
+        issues.append(_issue("error", "slug_mismatch", None, f"folder is {root.name}, slug is {config.get('slug')}"))
+    return issues
+
+
+def validate_root(root: Path, cwd: Path, all_days: bool) -> int:
+    def label(path: Path) -> str:
+        return str(path.relative_to(cwd))
+
     errors = 0
     config = load_json(root / "config" / "source.json")
-    errors += report(schema_issues(config, "source-config"), "config/source.json")
+    errors += report(schema_issues(config, "source-config"), label(root / "config" / "source.json"))
+    if in_hub(root):
+        errors += report(hub_issues(root, config), label(root))
     supplier = root / "data" / "supplier.json"
     if supplier.exists():
-        errors += report(schema_issues(load_json(supplier), "supplier"), "data/supplier.json")
+        errors += report(schema_issues(load_json(supplier), "supplier"), label(supplier))
     for path in sorted((root / "curation").glob("[0-9]*.json")) if (root / "curation").exists() else []:
         if not path.name.endswith(".source.json"):
-            errors += report(schema_issues(load_json(path), "curation"), str(path.relative_to(root)))
+            errors += report(schema_issues(load_json(path), "curation"), label(path))
     for path in sorted((root / "data" / "tariffs").glob("[0-9][0-9][0-9][0-9].json")) if (root / "data" / "tariffs").exists() else []:
         document = load_json(path)
         waivers = []
@@ -204,12 +216,25 @@ def main() -> int:
         if curation.exists():
             waivers = load_json(curation).get("acceptIssues", [])
         issues = apply_waivers(document_issues(document, int(path.stem), config.get("vse_id")), waivers)
-        errors += report(issues, str(path.relative_to(root)))
+        errors += report(issues, label(path))
     for tariff in config.get("dynamic", []):
         base = dynamic_dir(root, tariff)
         days = sorted((base / "vse").rglob("*.json"))
-        for path in (days if args.all_days else days[-3:]) + ([base / "latest.json"] if (base / "latest.json").exists() else []):
-            errors += report(dynamic_day_issues(path, load_json(path)), str(path.relative_to(root)))
+        for path in (days if all_days else days[-3:]) + ([base / "latest.json"] if (base / "latest.json").exists() else []):
+            errors += report(dynamic_day_issues(path, load_json(path)), label(path))
+    return errors
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--all-days", action="store_true", help="check the whole dynamic archive, not only the newest days")
+    args = parser.parse_args()
+    cwd = Path.cwd()
+    roots = org_roots(cwd)
+    if not roots:
+        annotate("error", "no config/source.json here and no utilities/<slug>/config/source.json")
+        return 1
+    errors = sum(validate_root(root, cwd, args.all_days) for root in roots)
     print(f"validation finished: {errors} error(s)")
     return 1 if errors else 0
 

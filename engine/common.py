@@ -14,6 +14,12 @@ USER_AGENT = "strompreise-schweiz-tariff-core/2.0 (+https://github.com/Stromprei
 ORG = "Strompreise-Schweiz"
 SCHEMA_BASE = f"https://raw.githubusercontent.com/{ORG}/tariff-core/main/schemas"
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
+# Own domain in front of GitHub Pages. The hub repo is the organization site, so every
+# utility has the same URL whether it lives in the hub or in its own repo.
+SITE_BASE = "https://data.strompreise-schweiz.ch"
+# Utilities without dynamic tariffs live in this repo, one folder each under HUB_DIR.
+HUB_REPO = "strompreise-schweiz.github.io"
+HUB_DIR = "utilities"
 
 
 def now_utc() -> datetime:
@@ -94,8 +100,31 @@ def dynamic_dir(root: Path, tariff: dict) -> Path:
     return base / tariff["id"] if tariff.get("id") else base
 
 
-def raw_url(slug: str, relative: str) -> str:
+def org_roots(cwd: Path) -> list[Path]:
+    """The utility roots to process from cwd. An own repo is one utility; the hub
+    repo holds one utility per folder under utilities/."""
+    if (cwd / "config" / "source.json").exists():
+        return [cwd]
+    hub = cwd / HUB_DIR
+    if not hub.is_dir():
+        return []
+    return sorted(p for p in hub.iterdir() if (p / "config" / "source.json").exists())
+
+
+def in_hub(root: Path) -> bool:
+    return root.resolve().parent.name == HUB_DIR
+
+
+def raw_url(root: Path, slug: str, relative: str) -> str:
+    """URL of a file in git, relative to the utility root. Works without the own domain."""
+    if in_hub(root):
+        return f"https://raw.githubusercontent.com/{ORG}/{HUB_REPO}/main/{HUB_DIR}/{slug}/{relative}"
     return f"https://raw.githubusercontent.com/{ORG}/{slug}/main/{relative}"
+
+
+def site_url(slug: str, relative: str) -> str:
+    """URL on the own domain. The site serves the utility's data/ folder under /<slug>/."""
+    return f"{SITE_BASE}/{slug}/{relative.removeprefix('data/')}"
 
 
 def slugify(value: str, limit: int = 60) -> str:

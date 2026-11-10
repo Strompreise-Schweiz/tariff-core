@@ -31,7 +31,45 @@ differentiation (HDN 5.5) work the same way. If a utility publishes a mapping on
 
 ## One repo for everything shared
 
-`tariff-core` holds schemas, validation, engine and workflows. It replaces `supplier-data-validation`.
+`tariff-core` holds schemas, validation, engine and workflows. It replaced `supplier-data-validation`,
+which has been deleted.
+
+## Hub repo for utilities without dynamic tariffs
+
+Most utilities will not maintain their data themselves; this project does it for them. Switzerland has
+about 600 grid operators, and one repo per utility does not scale for that:
+
+- Constant and multilevel tariffs change about once a year. A repo without commits for 60 days loses its
+  scheduled workflows, so the weekly check would stop unnoticed.
+- A change to the workflow files would have to be repeated in every repo.
+- There would be no list of all utilities.
+
+So a utility lives in exactly one place:
+
+- **Own repo** if it has dynamic tariffs or maintains its data itself. Dynamic tariffs commit every day
+  and grow the archive by about 70 MB per tariff and year, and an outage at one utility stays in its repo.
+- **Hub repo** `strompreise-schweiz.github.io` otherwise, in `utilities/<slug>/` with the same layout as
+  an own repo. One workflow run covers all of them, and corrections arrive as pull requests.
+
+The engine accepts both: run from a repo root it processes either the one utility or every folder
+under `utilities/`. `validate.py` rejects enabled dynamic tariffs in the hub and a folder name that
+differs from `slug`. A utility is never split between both places.
+
+## Own domain through GitHub Pages
+
+URLs on `raw.githubusercontent.com` contain the repo name, so moving a utility between the hub and an
+own repo would break every consumer. The hub repo is therefore the organization site of GitHub Pages
+and carries the own domain `data.strompreise-schweiz.ch`. Org repos are project sites, which GitHub
+serves under the same domain at `/<repo>/`. `build_site.py` gives both the same layout:
+
+```text
+https://data.strompreise-schweiz.ch/index.json            every utility
+https://data.strompreise-schweiz.ch/<slug>/index.json     one utility, hub or own repo
+```
+
+Moving a utility means removing its hub folder and enabling Pages in its repo, or the reverse.
+No URL changes. A Pages site is limited to 1 GB, so it serves the dynamic archive of the current year
+only. Older years stay in git and on `raw.githubusercontent.com`.
 
 ## Repository names
 

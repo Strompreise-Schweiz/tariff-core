@@ -2,13 +2,20 @@
 
 1. Find the utility's file. ElCom publishes the links as linked data on
    [LINDAS](https://lindas-cached.cluster.ldbar.ch/sparql/). Check the license terms of the source.
-2. Create a repo from [`utility-template`](https://github.com/Strompreise-Schweiz/utility-template).
-   Its name becomes `slug`. Repo names are part of the public URLs, so choose carefully.
+2. Decide where the utility lives. It is never split between both:
+   - **Hub repo** (default): constant and multilevel tariffs only, maintained by this project. Create
+     `utilities/<slug>/` in `strompreise-schweiz.github.io` with `config/source.json` and `curation/`.
+   - **Own repo**: the utility has dynamic tariffs or maintains its data itself. Create a repo from
+     [`utility-template`](https://github.com/Strompreise-Schweiz/utility-template), enable Pages with
+     source "GitHub Actions", and add it to `repositories.json` in the hub repo.
+
+   The folder or repo name becomes `slug` and part of the public URL, so choose carefully.
 3. Fill in `config/source.json`. The VSE identifier is on the VSE website.
-4. Run locally:
+4. Run locally, from the root of the utility's repo or of the hub repo:
 
    ```bash
    python3 ../tariff-core/engine/publish_static.py
+   python3 ../tariff-core/engine/validate.py
    ```
 
 5. Resolve the errors in `data/tariffs/<year>.report.json`:
@@ -21,5 +28,8 @@
    python3 ../tariff-core/engine/suggest_products.py 2026
    ```
 
+   In the hub, run `suggest_products.py` from `utilities/<slug>/`.
 7. For dynamic tariffs, the URL is in `prices.dynamic.url` of the yearly file. Add an entry per tariff in
-   `dynamic`, then start the workflow once by hand under Actions.
+   `dynamic`, then start the workflow once by hand under Actions. A utility in the hub that gets a
+   dynamic tariff moves to an own repo first: remove its hub folder, create the repo with the same name
+   and add it to `repositories.json`. Its URLs on the own domain stay the same.

@@ -154,7 +154,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Relative Pfadangabe oder URL zum Logo"
+          "description": "Path relative to supplier.json, or URL of the logo"
         },
         "mime_type": {
           "type": "string",
@@ -196,7 +196,7 @@
               "path": {
                 "type": "string",
                 "format": "uri-template",
-                "description": "Pfad/URL mit optionalem Platzhalter {year}, z.B. .../{year}.json"
+                "description": "Path or URL with an optional {year} placeholder, e.g. .../{year}.json"
               },
               "years": {
                 "type": "object",

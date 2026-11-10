@@ -1,16 +1,20 @@
 # Strompreise Schweiz
 
-Open data on Swiss electricity tariffs. `tariff-core` holds all logic. Each organization has its own
-repo with configuration, corrections and data. See `README.md`, `SCHEMA.md` and `docs/decisions.md`.
+Open data on Swiss electricity tariffs. `tariff-core` holds all logic. Utilities with constant and
+multilevel tariffs only live in the hub repo, one folder each under `utilities/<slug>/`. Utilities with
+dynamic tariffs, or that maintain their data themselves, have their own repo. Both hold configuration,
+corrections and data. See `README.md`, `SCHEMA.md` and `docs/decisions.md`.
 
 ## Repos
 
 The workspace folder holds all repos side by side:
 
 - `tariff-core`: schemas, engine, reusable workflows, tests
-- `utility-template`: template for new organizations
-- `ekz`, `bkw`, `groupe-e`, `elektrizitaetswerk-wangen`: organizations
-- `supplier-data-validation`: old, being replaced by `tariff-core`
+- `strompreise-schweiz.github.io`: hub repo with utilities without dynamic tariffs, GitHub Pages
+  organization site with the own domain and the overall index
+- `utility-template`: template for a utility with its own repo
+- `ekz`, `bkw`, `groupe-e`: utilities with their own repo
+- `elektrizitaetswerk-wangen`: moved to the hub repo, to be archived
 - `.github`: organization profile
 
 ## Working agreements
@@ -41,7 +45,10 @@ python -m pytest tests                                  # in tariff-core
 python3 ../tariff-core/engine/publish_static.py          # in an org repo
 python3 ../tariff-core/engine/fetch_and_normalize.py     # in an org repo
 python3 ../tariff-core/engine/validate.py                # in an org repo
+python3 ../tariff-core/engine/build_site.py              # in an org repo, site in _site/
 ```
+
+The scripts also run in the hub repo root and then process every folder under `utilities/`.
 
 The engine for dynamic tariffs uses the Python standard library only. `validate.py` and
 `publish_static.py` also need `jsonschema`.

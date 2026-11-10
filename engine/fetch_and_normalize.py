@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dynamic tariffs: fetch, check, archive and publish the stable latest.json.
 
-Run from the root of an org repo. Safe to run several times a day: a day is
+Run from the root of an org repo or of the hub repo. Safe to run several times a day: a day is
 only rewritten when its prices changed, so the fallback cron runs create no
 noise. Writes, per tariff, under data/dynamic/<id>/:
 
@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (SCHEMA_BASE, ZURICH, annotate, day_bounds, dynamic_dir, fetch_bytes, load_config,  # noqa: E402
-                    load_json, now_utc, raw_url, write_bytes, write_json, write_price_doc)
+                    load_json, now_utc, org_roots, raw_url, write_bytes, write_json, write_price_doc)
 from normalizers import REGISTRY  # noqa: E402
 from site_index import write_index  # noqa: E402
 
@@ -96,7 +96,7 @@ def store_day(base: Path, org: dict, tariff: dict, module, day: str, prices: lis
     return "changed" if existing is not None else "new"
 
 
-def write_latest(base: Path, org: dict, tariff: dict, today: date, generated_at: str) -> None:
+def write_latest(root: Path, base: Path, org: dict, tariff: dict, today: date, generated_at: str) -> None:
     """Rolling window of today and, once published, tomorrow. The URL never changes."""
     days, prices, publication = [], [], None
     for day in (today, today + timedelta(days=1)):
@@ -118,7 +118,7 @@ def write_latest(base: Path, org: dict, tariff: dict, today: date, generated_at:
             "organization": org["name"],
             "tariff_id": identifier,
             "tariff_name": tariff.get("name"),
-            "url": raw_url(org["slug"], relative),
+            "url": raw_url(root, org["slug"], relative),
             "generated_at": generated_at,
             "valid_from": prices[0]["start_timestamp"],
             "valid_to": prices[-1]["end_timestamp"],
@@ -173,7 +173,7 @@ def run_tariff(root: Path, org: dict, tariff: dict, now: datetime) -> list[str]:
                 continue
             result = store_day(base, org, tariff, module, day, day_prices, raw_bytes, raw, notes, retrieved_at)
             print(f"[{label}] {day}: {result}")
-    write_latest(base, org, tariff, today, retrieved_at)
+    write_latest(root, base, org, tariff, today, retrieved_at)
 
     for message in errors:
         annotate("warning", f"{label} {message}")
@@ -187,14 +187,18 @@ def run_tariff(root: Path, org: dict, tariff: dict, now: datetime) -> list[str]:
 
 
 def main() -> int:
-    root = Path.cwd()
-    org = load_config(root)
+    roots = org_roots(Path.cwd())
+    if not roots:
+        annotate("error", "no config/source.json here and no utilities/<slug>/config/source.json")
+        return 1
     now = now_utc()
     failures = []
-    for tariff in org["dynamic"]:
-        if tariff.get("enabled", True):
-            failures += run_tariff(root, org, tariff, now)
-    write_index(root, org)
+    for root in roots:
+        org = load_config(root)
+        for tariff in org["dynamic"]:
+            if tariff.get("enabled", True):
+                failures += run_tariff(root, org, tariff, now)
+        write_index(root, org)
     for failure in failures:
         annotate("error", failure)
     return 1 if failures else 0
