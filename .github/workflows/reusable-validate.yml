@@ -1,0 +1,30 @@
+name: Reusable validate org repo
+
+on:
+  workflow_call:
+    inputs:
+      engine-ref:
+        description: "Ref of tariff-core to use for the engine"
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Strompreise-Schweiz/tariff-core
+          ref: ${{ inputs.engine-ref }}
+          path: _engine
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r _engine/requirements.txt
+      - run: python3 _engine/engine/validate.py

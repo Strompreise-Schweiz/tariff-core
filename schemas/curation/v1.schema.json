@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/curation/v1.schema.json",
+  "title": "Manual corrections and product mapping (curation/<year>.json)",
+  "description": "Everything a person adds to a utility's data. Every correction needs a reason, so the published file stays traceable.",
+  "type": "object",
+  "required": [
+    "year"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "year": {
+      "type": "integer"
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "match",
+          "set",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "tariffName": {
+                "type": "string"
+              },
+              "tariffType": {
+                "type": "string"
+              },
+              "customerVoltageLevel": {
+                "type": "integer"
+              },
+              "customerType": {
+                "type": "string"
+              }
+            }
+          },
+          "set": {
+            "type": "object",
+            "description": "Keys may be dotted, e.g. prices.energy."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "removeTariffs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "match",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "tariffName": {
+                "type": "string"
+              },
+              "tariffType": {
+                "type": "string"
+              },
+              "customerVoltageLevel": {
+                "type": "integer"
+              },
+              "customerType": {
+                "type": "string"
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "addTariffs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "tariff",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "tariff": {
+            "type": "object"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "$ref": "../tariff-document/v1.schema.json#/$defs/Product"
+      }
+    },
+    "acceptIssues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "tariff": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+name: Reusable publish static tariffs
+
+on:
+  workflow_call:
+    inputs:
+      engine-ref:
+        description: "Ref of tariff-core to use for the engine"
+        required: false
+        type: string
+        default: main
+      offline:
+        description: "Rebuild from the stored raw files without fetching"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@v4
+
+      - name: Checkout tariff-core engine
+        uses: actions/checkout@v4
+        with:
+          repository: Strompreise-Schweiz/tariff-core
+          ref: ${{ inputs.engine-ref }}
+          path: _engine
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r _engine/requirements.txt
+
+      - name: Publish static tariffs
+        id: publish
+        continue-on-error: true
+        env:
+          OFFLINE_FLAG: ${{ inputs.offline && '--offline' || '' }}
+        # OFFLINE_FLAG is empty or a single fixed word, so it stays unquoted on purpose.
+        run: python3 _engine/engine/publish_static.py $OFFLINE_FLAG
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "data: static tariffs $(TZ=Europe/Zurich date +%Y-%m-%d)"
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet && git push && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Fail the run if a year could not be published
+        if: steps.publish.outcome == 'failure'
+        run: |
+          echo "::error::Static tariffs have errors. See the publish step and data/tariffs/<year>.report.json."
+          exit 1

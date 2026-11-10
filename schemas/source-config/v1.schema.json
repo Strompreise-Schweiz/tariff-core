@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/source-config/v1.schema.json",
+  "title": "Org repo configuration (config/source.json)",
+  "type": "object",
+  "required": [
+    "slug",
+    "name",
+    "vse_id",
+    "dynamic",
+    "static"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "country": {
+      "const": "CH"
+    },
+    "website": {
+      "type": "string",
+      "format": "uri"
+    },
+    "vse_id": {
+      "type": "string",
+      "pattern": "^CH\\d{11}$"
+    },
+    "data_license": {
+      "type": "string"
+    },
+    "dynamic": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "api_url"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "api_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "query": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "normalizer": {
+            "type": "string",
+            "default": "generic_vse"
+          },
+          "component_map": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "add_components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "tariff_type",
+                "unit",
+                "value",
+                "reason"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "tariff_type": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "valid_from": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "valid_to": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            }
+          },
+          "backfill_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "alert_after_hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "note": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "description": "First day with prices. Tariffs often exist only for one year."
+          },
+          "valid_to": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day with prices. After it the tariff is no longer fetched, and latest.json stays as it is."
+          }
+        }
+      }
+    },
+    "static": {
+      "type": "object",
+      "required": [
+        "sources"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "oneOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "file"
+                ]
+              }
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$",
+                "description": "File name under data/static/raw/."
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "file": {
+                "type": "string",
+                "description": "Hand-written source in VSE format, for utilities without a usable publication."
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

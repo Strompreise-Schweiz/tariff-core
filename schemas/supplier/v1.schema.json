@@ -1,0 +1,227 @@
+{
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/supplier/v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Strompreise Schweiz Supplier",
+  "type": "object",
+  "required": [
+    "name",
+    "location",
+    "website",
+    "email"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3
+    },
+    "website": {
+      "type": "string",
+      "format": "uri"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "uid": {
+      "type": "string",
+      "description": "Enterprises-UID in format CHE-XXX.XXX.XXX",
+      "pattern": "^CHE-[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}$"
+    },
+    "vse_id": {
+      "type": "string",
+      "description": "VSE-ID starts with CH, followed by 11 digits",
+      "pattern": "^CH[0-9]{11}$"
+    },
+    "location": {
+      "type": "object",
+      "required": [
+        "address",
+        "coordinates"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "object",
+          "required": [
+            "street",
+            "postal_code",
+            "city",
+            "canton",
+            "country"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "street": {
+              "type": "string"
+            },
+            "postal_code": {
+              "type": "string",
+              "pattern": "^[0-9]{4}$"
+            },
+            "city": {
+              "type": "string"
+            },
+            "canton": {
+              "type": "string",
+              "enum": [
+                "ZH",
+                "BE",
+                "LU",
+                "UR",
+                "SZ",
+                "OW",
+                "NW",
+                "GL",
+                "ZG",
+                "FR",
+                "SO",
+                "BS",
+                "BL",
+                "SH",
+                "AR",
+                "AI",
+                "SG",
+                "GR",
+                "AG",
+                "TG",
+                "TI",
+                "VD",
+                "VS",
+                "NE",
+                "GE",
+                "JU"
+              ]
+            },
+            "country": {
+              "type": "string",
+              "enum": [
+                "CH"
+              ]
+            }
+          }
+        },
+        "coordinates": {
+          "type": "object",
+          "required": [
+            "latitude",
+            "longitude"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "latitude": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
+        },
+        "map": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "google",
+                "osm"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "logo": {
+      "type": "object",
+      "required": [
+        "path",
+        "mime_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative Pfadangabe oder URL zum Logo"
+        },
+        "mime_type": {
+          "type": "string",
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/svg+xml",
+            "image/webp"
+          ]
+        }
+      }
+    },
+    "tariff_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annual": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "description",
+              "path",
+              "years"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "format": "uri-template",
+                "description": "Pfad/URL mit optionalem Platzhalter {year}, z.B. .../{year}.json"
+              },
+              "years": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "from": {
+                    "type": "integer",
+                    "minimum": 2000,
+                    "maximum": 2100
+                  },
+                  "to": {
+                    "type": "integer",
+                    "minimum": 2000,
+                    "maximum": 2100
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

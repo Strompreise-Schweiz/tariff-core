@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/tariff-document/v1.schema.json",
+  "title": "Static tariff document",
+  "description": "VSE TariffSubmission (OpenAPI 1.0.0, NNMV annex 10) with additive fields: tariffs[].id, products and _meta. A consumer of the VSE format can read this file unchanged.",
+  "type": "object",
+  "required": [
+    "dsoName",
+    "dsoNumber",
+    "tariffs",
+    "products",
+    "_meta"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "dsoName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dsoNumber": {
+      "type": "integer",
+      "minimum": 10000000000,
+      "maximum": 99999999999
+    },
+    "tariffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Tariff"
+      }
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Product"
+      }
+    },
+    "_meta": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "year",
+        "source",
+        "repairs",
+        "overrides"
+      ]
+    }
+  },
+  "$defs": {
+    "Tariff": {
+      "type": "object",
+      "required": [
+        "id",
+        "tariffName",
+        "tariffType",
+        "tariffForm",
+        "startDate",
+        "endDate",
+        "customerType",
+        "prices"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Additive. Stable key, because tariffName is not unique in real files."
+        },
+        "customerVoltageLevel": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 7
+        },
+        "tariffName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tariffType": {
+          "enum": [
+            "electricity",
+            "grid",
+            "metering",
+            "regional_fees"
+          ]
+        },
+        "tariffForm": {
+          "enum": [
+            "constant",
+            "multilevel",
+            "dynamic"
+          ]
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "customerType": {
+          "type": "string"
+        },
+        "prices": {
+          "$ref": "#/$defs/Prices"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tariffForm": {
+                "const": "dynamic"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "prices": {
+                "required": [
+                  "dynamic"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Prices": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/SimplePrice"
+        },
+        "energy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimeBasedPrice"
+          }
+        },
+        "power": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimeBasedPrice"
+          }
+        },
+        "reactivePower": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimeBasedPrice"
+          }
+        },
+        "refundStorage": {
+          "$ref": "#/$defs/SimplePrice"
+        },
+        "dynamic": {
+          "type": "object",
+          "required": [
+            "url"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "municipalityTaxes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MunicipalityTaxPrice"
+          }
+        },
+        "cantonalTaxes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CantonalTaxPrice"
+          }
+        }
+      }
+    },
+    "SimplePrice": {
+      "type": "object",
+      "required": [
+        "price",
+        "priceUnit"
+      ],
+      "properties": {
+        "price": {
+          "type": "number",
+          "minimum": 0
+        },
+        "priceUnit": {
+          "enum": [
+            "CHF/kWh",
+            "CHF/kW",
+            "CHF/kW/M",
+            "CHF/kVarh",
+            "CHF/M",
+            "CHF"
+          ]
+        }
+      }
+    },
+    "TimeBasedPrice": {
+      "type": "object",
+      "required": [
+        "weekdays",
+        "from",
+        "to",
+        "price",
+        "priceUnit"
+      ],
+      "properties": {
+        "months": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "enum": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ]
+          }
+        },
+        "weekdays": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "enum": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "So"
+            ]
+          }
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "price": {
+          "type": "number",
+          "minimum": 0
+        },
+        "priceUnit": {
+          "enum": [
+            "CHF/kWh",
+            "CHF/kW",
+            "CHF/kW/M",
+            "CHF/kVarh",
+            "CHF/M",
+            "CHF"
+          ]
+        }
+      }
+    },
+    "MunicipalityTaxPrice": {
+      "type": "object",
+      "required": [
+        "municipalityNumber",
+        "municipalityName"
+      ],
+      "properties": {
+        "municipalityNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "municipalityName": {
+          "type": "string"
+        },
+        "municipalityBase": {
+          "$ref": "#/$defs/SimplePrice"
+        },
+        "municipalityEnergy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimeBasedPrice"
+          }
+        },
+        "municipalityComment": {
+          "type": "string"
+        }
+      }
+    },
+    "CantonalTaxPrice": {
+      "type": "object",
+      "required": [
+        "cantonName"
+      ],
+      "properties": {
+        "cantonName": {
+          "enum": [
+            "AG",
+            "AI",
+            "AR",
+            "BE",
+            "BL",
+            "BS",
+            "FR",
+            "GE",
+            "GL",
+            "GR",
+            "JU",
+            "LU",
+            "NE",
+            "NW",
+            "OW",
+            "SG",
+            "SH",
+            "SO",
+            "SZ",
+            "TG",
+            "TI",
+            "UR",
+            "VD",
+            "VS",
+            "ZG",
+            "ZH"
+          ]
+        },
+        "cantonBase": {
+          "$ref": "#/$defs/SimplePrice"
+        },
+        "cantonEnergy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TimeBasedPrice"
+          }
+        },
+        "cantonComment": {
+          "type": "string"
+        }
+      }
+    },
+    "Product": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "status",
+        "components"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "suggested",
+            "verified"
+          ],
+          "description": "verified: a person checked it against the utility's price sheet."
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "note": {
+          "type": "string"
+        },
+        "components": {
+          "type": "object",
+          "required": [
+            "electricity",
+            "grid"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "electricity": {
+              "type": "string"
+            },
+            "grid": {
+              "type": "string"
+            },
+            "metering": {
+              "type": "string"
+            },
+            "regional_fees": {
+              "type": "string"
+            }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "description": "Set when a customer must belong to a group to use this product, such as an EKZ grid cluster.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "howToFind": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

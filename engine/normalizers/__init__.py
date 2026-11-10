@@ -1,7 +1,7 @@
 from . import generic_vse
 
-# Maps the "normalizer" key from a calling repo's config/source.json to a
-# module exposing local_date_of(raw), to_vse(raw), normalize(raw, org, retrieved_at, date).
+# Maps "normalizer" in config/source.json to a module exposing
+# canonicalize(raw, tariff) and normalize(doc, org, tariff, date, retrieved_at, check).
 REGISTRY = {
     "generic_vse": generic_vse,
 }
