@@ -14,7 +14,6 @@ The workspace folder holds all repos side by side:
   organization site with the own domain and the overall index
 - `utility-template`: template for a utility with its own repo
 - `ekz`, `bkw`, `groupe-e`: utilities with their own repo
-- `elektrizitaetswerk-wangen`: moved to the hub repo, to be archived
 - `.github`: organization profile
 
 ## Working agreements

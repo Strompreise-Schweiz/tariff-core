@@ -73,9 +73,9 @@ only. Older years stay in git and on `raw.githubusercontent.com`.
 
 ## Repository names
 
-Utility repos use the name of the company, shortened where the short form is the established name
-(`ekz`, `bkw`, `groupe-e`, `elektrizitaetswerk-wangen`). Infrastructure repos start with `tariff-` or
-`utility-`. Repo names are part of the public URLs, so they do not change once consumers use them.
+Utility repos and hub folders use the name of the company, shortened where the short form is the
+established name (`ekz`, `bkw`, `groupe-e`, `elektrizitaetswerk-wangen`). Infrastructure repos start with
+`tariff-` or `utility-`. These names are part of the public URLs, so they do not change once consumers use them.
 
 ## Python instead of Node for validation
 
