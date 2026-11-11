@@ -132,3 +132,14 @@ The old fetcher called the API without parameters and took whatever came back. T
   holds one price per day and not the dynamic tariff.
 
 The fetcher now names `tariff_name` and the day, and looks back three days to close gaps.
+
+## A broken tariff is left out, not the whole year
+
+A tariff with an error of its own is removed from the published file and listed in `_meta.excluded`
+with its problems. The rest of the year is published. Before, one broken tariff blocked the year: at
+BKW in November 2026, a municipality number `#N/A` in 9 of about 1000 tariffs kept all of them back.
+
+Errors of the document as a whole still block it, because they make every tariff doubtful: a wrong
+operator number, ids that are not unique, a correction that no longer matches, or a curated product
+that needs a left-out tariff. A year in which every tariff has an error is blocked too, so no empty
+file replaces a good one. The status page shows how many tariffs were left out.

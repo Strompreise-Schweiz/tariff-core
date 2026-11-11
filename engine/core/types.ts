@@ -1,4 +1,7 @@
 /** Types of the files this project reads and writes. The JSON schemas in schemas/ are binding. */
+import type { ExcludedTariff } from "./exclusion.ts";
+
+export type { ExcludedTariff };
 
 export type Month = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec";
 export type Weekday = "Mo" | "Tu" | "We" | "Th" | "Fr" | "Sa" | "Su";
@@ -90,6 +93,8 @@ export interface TariffDocument {
     repairs: Repair[];
     overrides: AppliedCuration[];
     issues?: Issue[];
+    /** Tariffs of the source that were left out because of errors of their own. */
+    excluded?: ExcludedTariff[];
   };
   tariffs: Tariff[];
   products: Product[];

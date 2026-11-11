@@ -327,3 +327,30 @@ test("a product selection is valid", () => {
   document.products = [product];
   assert.deepEqual(errors(documentIssues(document as TariffDocument, 2026)), []);
 });
+
+test("a tariff with an error of its own is left out and the year is published", async () => {
+  // Shape of BKW 2026: a municipality number "#N/A", an Excel error in the export.
+  const raw = ekzLike();
+  raw.tariffs[6].prices.municipalityTaxes[0].municipalityNumber = "#N/A";
+  const root = repo(raw);
+  assert.equal(await publish(root), 0);
+  const document = readJsonFile(path.join(root, "data/tariffs/2026.json"));
+  assert.equal(document.tariffs.length, ekzLike().tariffs.length - 1);
+  assert.deepEqual(document._meta.excluded.map((t: Obj) => [t.id, t.tariffName]), [["regional-fees-abgaben-ne7", "Abgaben"]]);
+  assert.equal(document._meta.excluded[0].problems[0], 'prices/municipalityTaxes/0/municipalityNumber: must be integer, is "#N/A"');
+  const status = readJsonFile(path.join(root, "data/status.json"));
+  assert.deepEqual([status.years[0].blocked, status.years[0].excluded], [false, 1]);
+});
+
+test("a product that needs a left-out tariff blocks the year", async () => {
+  const raw = ekzLike();
+  raw.tariffs[6].prices.municipalityTaxes[0].municipalityNumber = "#N/A";
+  const root = repo(raw);
+  writeJsonFile(path.join(root, "curation/2026.json"), { year: 2026, products: [{
+    id: "p", name: "P", status: "suggested",
+    components: { electricity: "electricity-energie-erneuerbar-ne7", grid: "grid-netz-400st-ne7", regional_fees: "regional-fees-abgaben-ne7" },
+  }] });
+  assert.equal(await publish(root), 1);
+  const report = readJsonFile(path.join(root, "data/tariffs/2026.report.json"));
+  assert.ok(report.issues.some((i: Obj) => i.code === "product_unknown_tariff"));
+});

@@ -4,6 +4,7 @@ import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 
 import { applyCuration, assignIds } from "./core/curation.ts";
+import { excludeBrokenTariffs } from "./core/exclusion.ts";
 import { deepEqual, toJson } from "./core/json.ts";
 import { repairStatic, type RepairedDocument } from "./core/normalizers/static-vse.ts";
 import { applyWaivers, documentIssues } from "./core/rules.ts";
@@ -107,7 +108,7 @@ export async function publish(root: string, offline = false): Promise<number> {
   for (const year of [...collected.byYear.keys()].sort((a, b) => a - b)) {
     const curation = readJsonIfExists<Curation>(path.join(root, "curation", `${year}.json`)) ?? {};
     const curated = applyCuration(collected.byYear.get(year)!, curation);
-    const document: TariffDocument = toJson({
+    const built: TariffDocument = toJson({
       $schema: `${SCHEMA_BASE}/tariff-document/v1.schema.json`,
       dsoName: collected.dsoName!,
       dsoNumber: collected.dsoNumber!,
@@ -120,15 +121,24 @@ export async function publish(root: string, offline = false): Promise<number> {
         repairs: collected.repairs,
         overrides: curated.applied,
         issues: [],
+        excluded: [],
       },
       tariffs: assignIds(curated.tariffs) as Tariff[],
       products: curation.products ?? [],
     });
-    const issues = applyWaivers([...curated.issues, ...documentIssues(document, year, org.vse_id)], curation.acceptIssues);
+    const checkYear = (doc: TariffDocument) =>
+      applyWaivers([...curated.issues, ...documentIssues(doc, year, org.vse_id)], curation.acceptIssues);
+    // A tariff with an error of its own is left out and listed, so it does not block the rest of the year.
+    const { document, excluded, issues } = excludeBrokenTariffs(built, checkYear);
+    document._meta.excluded = excluded;
     document._meta.issues = issues.filter((issue) => issue.severity !== "error");
+    if (excluded.length) {
+      annotate("warning", `${org.slug} ${year}: left out ${excluded.length} tariffs with errors, see _meta.excluded`);
+      for (const tariff of excluded) console.log(`  left out ${tariff.id}: ${tariff.problems.join("; ")}`);
+    }
     const errors = report(issues, `${org.slug} ${year}`);
     const reportPath = path.join(tariffsDir, `${year}.report.json`);
-    years.push(yearStatus(year, issues, errors === 0 || exists(path.join(tariffsDir, `${year}.json`))));
+    years.push(yearStatus(year, issues, errors === 0 || exists(path.join(tariffsDir, `${year}.json`)), excluded.length));
     if (errors) {
       failures += errors;
       writeJson(reportPath, { year, published: false, issues });
@@ -142,7 +152,8 @@ export async function publish(root: string, offline = false): Promise<number> {
       continue;
     }
     writeJson(output, document);
-    console.log(`[${org.slug}] ${year}: published ${document.tariffs.length} tariffs, ${document.products.length} products`);
+    const left = excluded.length ? `, ${excluded.length} left out` : "";
+    console.log(`[${org.slug}] ${year}: published ${document.tariffs.length} tariffs${left}, ${document.products.length} products`);
   }
 
   const current = path.join(tariffsDir, `${currentYear}.json`);

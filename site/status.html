@@ -64,7 +64,7 @@
     </table>
   </div>
   <ul class="legend">
-    <li><b>Static tariffs:</b> per year whether it is published, and the issues the checks found. A blocked year keeps the previous file online.</li>
+    <li><b>Static tariffs:</b> per year whether it is published, and the issues the checks found. A tariff with an error of its own is left out and listed with the reason in <code>_meta.excluded</code> of the file. Errors of the whole file block the year, and the previous file stays online.</li>
     <li><b>VSE:</b> whether a file follows the <a href="https://github.com/Strompreise-Schweiz/tariff-core/tree/main/schemas/vse">OpenAPI definitions of the VSE</a>, version 1.0.0 and 1.0.1. Information only, it does not block publication.</li>
     <li><b>Dynamic tariffs:</b> the days in <code>latest.json</code> and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
   </ul>
@@ -103,6 +103,7 @@ function staticCell(slug, status) {
       ? chip("bad", `${year.year} blocked`, year.online ? "The previous file stays online" : "No file online")
       : chip("ok", `${year.year} published`);
     const counts = [
+      year.excluded ? link(`/${slug}/tariffs/${year.year}.json`, chip("warn", `${plural(year.excluded, "tariff")} left out`, "Errors of their own, see _meta.excluded")) : null,
       year.errors ? link(`/${slug}/tariffs/${year.year}.report.json`, plural(year.errors, "error")) : null,
       year.warnings ? `${plural(year.warnings, "warning")}` : null,
       year.accepted ? `${year.accepted} accepted` : null,

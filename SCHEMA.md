@@ -169,5 +169,8 @@ Schemas: [`schemas/source-config/`](schemas/source-config/v1.schema.json) and
 
 A rule that no longer matches anything is an error, so outdated corrections become visible.
 
-Issues that block publication are listed in [`engine/core/rules.ts`](engine/core/rules.ts). A year with errors is not
+Issues that block publication are listed in [`engine/core/rules.ts`](engine/core/rules.ts).
+An error of a single tariff does not block the year: the tariff is left out and listed in
+`_meta.excluded` with its problems, for example a municipality number `#N/A`. Errors of the document as
+a whole block it, as does a year in which every tariff has an error. A year with errors is not
 published: the previous file stays online and `<year>.report.json` shows the reasons.

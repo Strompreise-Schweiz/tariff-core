@@ -20,15 +20,17 @@ export interface YearStatus {
   errors: number;
   warnings: number;
   accepted: number;
+  /** Tariffs of the source left out because of errors of their own, listed in _meta.excluded. */
+  excluded: number;
   /** Number of issues per code, errors and warnings. */
   codes: Record<string, number>;
 }
 
-export function yearStatus(year: number, issues: Issue[], online: boolean): YearStatus {
+export function yearStatus(year: number, issues: Issue[], online: boolean, excluded = 0): YearStatus {
   const count = (severity: Issue["severity"]) => issues.filter((issue) => issue.severity === severity).length;
   const codes: Record<string, number> = {};
   for (const issue of issues.filter((i) => i.severity !== "accepted")) codes[issue.code] = (codes[issue.code] ?? 0) + 1;
-  return { year, blocked: count("error") > 0, online, errors: count("error"), warnings: count("warning"), accepted: count("accepted"), codes };
+  return { year, blocked: count("error") > 0, online, errors: count("error"), warnings: count("warning"), accepted: count("accepted"), excluded, codes };
 }
 
 export function writeStatus(root: string, org: SourceConfig, years: YearStatus[], conformance: ConformanceReport): void {
