@@ -51,13 +51,14 @@ With up to about 90 KB per `latest.json` (a tariff with several components), 100
 
 ## Own domain: the only URL that stays yours
 
-A URL on `raw.githubusercontent.com` ties all consumers to GitHub and to the repo name. The own domain
-must be live before the first external user. Then the backend can change, for example to Cloudflare in
-front of GitHub, without changing a URL.
+A URL on `raw.githubusercontent.com` ties all consumers to GitHub and to the repo name. With the own
+domain the backend can change, for example to Cloudflare in front of GitHub, without changing a URL.
+Point consumers to it, never to `raw.githubusercontent.com`.
 
-Setting it up, once:
+How it is set up (DNS at Vercel, where `strompreise-schweiz.ch` is hosted):
 
 1. DNS: a `CNAME` record `data.strompreise-schweiz.ch` pointing to `strompreise-schweiz.github.io`.
 2. Hub repo: Settings > Pages > Source "GitHub Actions", custom domain `data.strompreise-schweiz.ch`, "Enforce HTTPS".
 3. Each org repo: Settings > Pages > Source "GitHub Actions". No own domain: it inherits the hub's.
+   Without this, the "Deploy site" run fails with "Ensure GitHub Pages has been enabled".
 4. Verify the domain for the organization under Settings > Pages, so nobody else can claim it.
