@@ -56,10 +56,26 @@ function toDsoNumber(value: string | number, log: RepairLog): number | string {
 }
 
 function toIsoDate(value: unknown, log: RepairLog): unknown {
-  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(value).trim());
-  if (!match) return value;
-  log.add("date_to_iso", "converted dd.mm.yyyy (NNMV annex 10) to ISO 8601");
-  return `${match[3]}-${match[2]}-${match[1]}`;
+  const text = String(value).trim();
+  const swiss = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(text);
+  if (swiss) {
+    log.add("date_to_iso", "converted dd.mm.yyyy (NNMV annex 10) to ISO 8601");
+    return `${swiss[3]}-${swiss[2]}-${swiss[1]}`;
+  }
+  // BKW writes 2026-01-01T00:00:00. Only midnight is dropped: another time would change the meaning.
+  const midnight = /^(\d{4}-\d{2}-\d{2})T00:00(:00(\.0+)?)?$/.exec(text);
+  if (midnight) {
+    log.add("datetime_to_date", "removed the time 00:00:00 from a date");
+    return midnight[1];
+  }
+  return value;
+}
+
+/** A whole number written as text, such as "7", becomes a number. Anything else stays for the schema check. */
+function toInteger(value: unknown, code: string, field: string, log: RepairLog): unknown {
+  if (typeof value !== "string" || !/^\s*\d+\s*$/.test(value)) return value;
+  log.add(code, `converted ${field} from text to a number`);
+  return Number(value);
 }
 
 function toTime(value: unknown, log: RepairLog): string {
@@ -135,6 +151,9 @@ function repairRegional(entries: Loose[] | undefined, base: string, energy: stri
     if ("comment" in item && !(comment in item)) rename(item, "comment", comment);
     if (energy in item) item[energy] = toTimePrices(item[energy], energy, log);
     if (base in item) item[base] = toSimplePrice(item[base], base, log);
+    if ("municipalityNumber" in item) {
+      item.municipalityNumber = toInteger(item.municipalityNumber, "municipality_number_to_integer", "municipalityNumber", log);
+    }
     return item;
   });
 }
@@ -213,6 +232,9 @@ export function repairStatic(raw: unknown): { document: RepairedDocument; repair
     }
     for (const key of ["startDate", "endDate"]) {
       if (key in item) item[key] = toIsoDate(item[key], log);
+    }
+    if ("customerVoltageLevel" in item) {
+      item.customerVoltageLevel = toInteger(item.customerVoltageLevel, "voltage_level_to_integer", "customerVoltageLevel", log);
     }
     item.prices = repairPrices(item.prices ?? {}, log);
     return item;

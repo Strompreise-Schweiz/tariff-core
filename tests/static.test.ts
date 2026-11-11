@@ -91,6 +91,28 @@ test("the dso number from the tariffs becomes an integer", () => {
   assert.equal(repairs.find((r) => r.code === "dso_number_to_integer")?.detail, 'converted "10063012345" to an integer');
 });
 
+test("BKW deviations are repaired: date with time, numbers as text", () => {
+  // Shape of the BKW file of November 2026: 1013 dates with time, 425 levels and 9 municipality numbers as text.
+  const raw = ekzLike();
+  raw.tariffs[0] = { ...raw.tariffs[0], startDate: "2026-01-01T00:00:00", endDate: "2026-12-31T00:00:00", customerVoltageLevel: "7" };
+  raw.tariffs[6].prices.municipalityTaxes[0].municipalityNumber = "12389";
+  const [document, issues] = build(raw);
+  assert.deepEqual(errors(issues), []);
+  const [first, , , , , , fees] = document.tariffs;
+  assert.deepEqual([first.startDate, first.endDate, first.customerVoltageLevel], ["2026-01-01", "2026-12-31", 7]);
+  assert.equal(fees.prices.municipalityTaxes[0].municipalityNumber, 12389);
+  const codes = new Set(document._meta.repairs.map((r: Obj) => r.code));
+  for (const code of ["datetime_to_date", "voltage_level_to_integer", "municipality_number_to_integer"]) assert.ok(codes.has(code), code);
+});
+
+test("a date with a time other than midnight is not repaired", () => {
+  const raw = ekzLike();
+  raw.tariffs[0].startDate = "2026-01-01T06:00:00";
+  const [document, issues] = build(raw);
+  assert.equal(document.tariffs[0].startDate, "2026-01-01T06:00:00");
+  assert.ok(errors(issues).some((i) => i.code === "schema" && i.path?.endsWith("startDate")));
+});
+
 function uznachLike(): Obj {
   const raw = ekzLike();
   for (const tariff of raw.tariffs) {
