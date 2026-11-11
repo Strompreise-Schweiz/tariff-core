@@ -50,9 +50,10 @@ const codes = (issues: Issue[]) => new Set(issues.map((i) => i.code));
 test("real shape passes with repairs logged", () => {
   const [document, issues] = build(ekzLike());
   assert.deepEqual(errors(issues), []);
-  assert.deepEqual(new Set(document._meta.repairs.map((r: Obj) => r.code)), new Set(["end_of_day_to_midnight"]));
+  assert.deepEqual(new Set(document._meta.repairs.map((r: Obj) => r.code)), new Set());
   const energy = document.tariffs[0].prices.energy[0];
-  assert.equal(energy.to, "00:00");
+  // EKZ writes the whole day as 00:00 to 23:59, valid in VSE 1.0.1, so it stays as published.
+  assert.deepEqual([energy.from, energy.to], ["00:00", "23:59"]);
   assert.ok(energy.weekdays.includes("Su"));
 });
 
@@ -353,4 +354,39 @@ test("a product that needs a left-out tariff blocks the year", async () => {
   assert.equal(await publish(root), 1);
   const report = readJsonFile(path.join(root, "data/tariffs/2026.report.json"));
   assert.ok(report.issues.some((i: Obj) => i.code === "product_unknown_tariff"));
+});
+
+test("windows follow VSE 1.0.1: 23:59 ends the day, from is less than to", () => {
+  const raw = single("multilevel", { energy: [
+    price(0.1, { from: "07:00", to: "21:00" }),
+    price(0.05, { from: "21:00", to: "07:00" }),
+  ] });
+  const [document, issues] = build(raw);
+  assert.deepEqual(errors(issues), []);
+  assert.deepEqual(document.tariffs[0].prices.energy.map((e: Obj) => [e.from, e.to, e.price]),
+    [["07:00", "21:00", 0.1], ["21:00", "23:59", 0.05], ["00:00", "07:00", 0.05]]);
+  assert.ok(document._meta.repairs.some((r: Obj) => r.code === "overnight_window_split"));
+});
+
+test("an end of day as 00:00 or 24:00 becomes 23:59, and 00:00 to 23:59 counts as the whole day", () => {
+  const raw = single("multilevel", { energy: [
+    price(0.1, { from: "00:00", to: "07:00" }),
+    price(0.2, { from: "07:00", to: "24:00" }),
+  ] });
+  const [document, issues] = build(raw);
+  assert.deepEqual(errors(issues), []);
+  assert.deepEqual(document.tariffs[0].prices.energy.map((e: Obj) => [e.from, e.to]), [["00:00", "07:00"], ["07:00", "23:59"]]);
+  const [constant, constantIssues] = build(single("constant", { energy: [price(0.1, { from: "00:00", to: "24:00" })] }));
+  assert.deepEqual([constant.tariffs[0].prices.energy[0].from, constant.tariffs[0].prices.energy[0].to], ["00:00", "23:59"]);
+  assert.deepEqual(errors(constantIssues), []);
+});
+
+test("the file states its VSE version, its engine and what the source followed", async () => {
+  const root = repo(ekzLike());
+  assert.equal(await publish(root), 0);
+  const meta = readJsonFile(path.join(root, "data/tariffs/2026.json"))._meta;
+  assert.equal(meta.vseVersion, "1.0.1");
+  assert.deepEqual([meta.generator.name, typeof meta.generator.version], ["tariff-core", "string"]);
+  // The source writes Su like EKZ, which only 1.0.1 allows.
+  assert.deepEqual(meta.source[0].conformsTo, ["1.0.1"]);
 });

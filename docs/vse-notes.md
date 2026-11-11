@@ -29,7 +29,8 @@ There is no legal requirement for a machine-readable electricity label (EKZ, Jan
 | Energy | `prices.energy` | Nested `prices`, sometimes `prices.grid` | Direct list at EKZ | Repaired |
 | Day | `weekdays` | `day: "*"` | `weekdays` at EKZ | Repaired |
 | Sunday | `So`, `Su` from 1.0.1 | `su` | `Su` at EKZ | Written as `Su` (1.0.1) |
-| End of day | `00:00` (FAQ), `23:59` from 1.0.1 | `00:00` | `23:59` at EKZ | Repaired to `00:00` |
+| End of day | `00:00` (FAQ), `23:59` from 1.0.1 | `00:00` | `23:59` at EKZ | Written as `23:59` (1.0.1), `24:00` and `00:00` converted |
+| Window across midnight | Allowed | `21:00` to `07:00` | At BKW | Split in two, 1.0.1 requires `from` < `to` |
 | Refund | `prices.refundStorage` positive | `tariffType: refund` negative | `refundStorage` at EKZ | Repaired |
 | Type | Enum | `" regional_fees "` with spaces | | Repaired |
 | Voltage level | 2 to 7 | 2 to 7 | 0 at EW Uznach | Blocked, needs curation |

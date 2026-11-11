@@ -30,6 +30,7 @@ const UNIT_BY_FIELD: Record<string, string> = {
 };
 // VSE 1.0.0 wrote Sunday as So, 1.0.1 as Su. Both are read, Su is written.
 const WEEKDAYS = new Map([["mo", "Mo"], ["tu", "Tu"], ["we", "We"], ["th", "Th"], ["fr", "Fr"], ["sa", "Sa"], ["so", "Su"], ["su", "Su"]]);
+// Ways sources write the end of a day. VSE 1.0.1 writes 23:59.
 const END_OF_DAY = new Set(["23:59", "24:00", "23:59:59"]);
 
 class RepairLog {
@@ -78,11 +79,27 @@ function toInteger(value: unknown, code: string, field: string, log: RepairLog):
   return Number(value);
 }
 
-function toTime(value: unknown, log: RepairLog): string {
-  const text = String(value).trim();
-  if (!END_OF_DAY.has(text)) return text;
-  log.add("end_of_day_to_midnight", `converted ${text} to 00:00: the VSE FAQ ends a day at 00:00`);
-  return "00:00";
+/**
+ * The window of a time-based price in the form of VSE 1.0.1: the end of the day is 23:59, and from
+ * is less than to, so a window across midnight becomes two. The whole day is 00:00 to 00:00, or
+ * 00:00 to 23:59 as some sources write it: both are valid and kept as published.
+ */
+function toWindows(rawFrom: unknown, rawTo: unknown, log: RepairLog): [string, string][] {
+  const from = String(rawFrom ?? "00:00").trim();
+  let to = String(rawTo ?? "00:00").trim();
+  if (from === to) {
+    if (from !== "00:00") log.add("whole_day_to_0000", "wrote a whole-day window as 00:00 to 00:00 (VSE 1.0.1)");
+    return [["00:00", "00:00"]];
+  }
+  if (END_OF_DAY.has(to) || to === "00:00") {
+    if (to !== "23:59") log.add("end_of_day_to_2359", `converted the end of day ${to} to 23:59 (VSE 1.0.1)`);
+    to = "23:59";
+  }
+  if (from > to) {
+    log.add("overnight_window_split", "split a window across midnight in two, because VSE 1.0.1 requires from < to");
+    return [[from, "23:59"], ["00:00", to]];
+  }
+  return [[from, to]];
 }
 
 function toWeekdays(item: Loose, log: RepairLog): string[] {
@@ -98,33 +115,31 @@ function toWeekdays(item: Loose, log: RepairLog): string[] {
   });
 }
 
-function toTimePrice(item: unknown, field: string, log: RepairLog): Loose {
+function toTimePrice(item: unknown, field: string, log: RepairLog): Loose[] {
   const priceUnit = UNIT_BY_FIELD[field];
   if (isNumber(item)) {
     log.add("number_to_time_price", `wrapped plain number in ${field} as an all-day price`);
-    return { months: [], weekdays: [], from: "00:00", to: "00:00", price: item, priceUnit };
+    return [{ months: [], weekdays: [], from: "00:00", to: "00:00", price: item, priceUnit }];
   }
   const { day: _day, ...output } = item as Loose;
   output.months = output.months?.length ? output.months : [];
   output.weekdays = toWeekdays(item as Loose, log);
-  output.from = toTime(output.from ?? "00:00", log);
-  output.to = toTime(output.to ?? "00:00", log);
   if (!("priceUnit" in output)) {
     log.add("price_unit_added", `added the missing priceUnit in ${field}`);
     output.priceUnit = priceUnit;
   }
-  return output;
+  return toWindows(output.from, output.to, log).map(([from, to]) => ({ ...output, from, to }));
 }
 
 /** Accept a list of prices, a plain number and the nested NNMV {"prices": [...]} shape. */
 function toTimePrices(value: unknown, field: string, log: RepairLog): Loose[] {
-  if (isNumber(value)) return [toTimePrice(value, field, log)];
+  if (isNumber(value)) return toTimePrice(value, field, log);
   return ((value ?? []) as unknown[]).flatMap((item) => {
     if (isObject(item) && "prices" in item && !("price" in item)) {
       log.add("nested_prices_flattened", "flattened nested prices (NNMV annex 10)");
-      return (item.prices as unknown[]).map((inner) => toTimePrice(inner, field, log));
+      return (item.prices as unknown[]).flatMap((inner) => toTimePrice(inner, field, log));
     }
-    return [toTimePrice(item, field, log)];
+    return toTimePrice(item, field, log);
   });
 }
 

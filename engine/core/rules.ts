@@ -27,14 +27,22 @@ function issue(severity: Severity, code: string, message: string, tariff?: strin
   return tariff === undefined ? { severity, code, message } : { severity, code, tariff, message };
 }
 
+/** 00:00 to 00:00, or 00:00 to 23:59 since VSE 1.0.1 names 23:59 as the end of the day. */
+export function isWholeDay(from: string, to: string): boolean {
+  return from === to || (from === "00:00" && to === "23:59");
+}
+
 function minutes(time: string): number {
   return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 }
 
-/** The minute ranges [from, to) of a window. Equal times mean the whole day, 00:00 as end means midnight. */
+/**
+ * The minute ranges [from, to) of a window. Equal times mean the whole day. 23:59 is the end of the
+ * day in VSE 1.0.1, so it covers the last minute too, as does 00:00 as end.
+ */
 function windowRanges(from: string, to: string): [number, number][] {
   const start = minutes(from);
-  const end = minutes(to);
+  const end = to === "23:59" ? MINUTES_PER_DAY : minutes(to);
   if (start === end) return [[0, MINUTES_PER_DAY]];
   if (end === 0) return [[start, MINUTES_PER_DAY]];
   return start < end ? [[start, end]] : [[start, MINUTES_PER_DAY], [0, end]];
@@ -88,7 +96,7 @@ export function tariffIssues(tariff: Tariff, year: number): Issue[] {
       const values = prices[field] ?? [];
       if (values.length > 1) add("error", "constant_with_several_prices", `${field} has ${values.length} entries`);
       for (const value of values) {
-        if (value.months?.length || value.weekdays?.length || value.from !== value.to) {
+        if (value.months?.length || value.weekdays?.length || !isWholeDay(value.from, value.to)) {
           add("error", "constant_with_time_window", `${field} applies only part of the time`);
         }
       }

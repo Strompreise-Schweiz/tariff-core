@@ -29,8 +29,10 @@ Unchanged in both: constant prices are one entry with empty `months` and `weekda
 
 ## How this project uses them
 
-- **Writing:** the files of this project follow 1.0.1. The own schema
-  [`tariff-document`](../tariff-document/v1.schema.json) is 1.0.1 with additive fields.
+- **Writing:** the files of this project follow 1.0.1 and say so in `_meta.vseVersion`. The own schema
+  [`tariff-document`](../tariff-document/v1.schema.json) is 1.0.1 with additive fields. Time windows:
+  the end of the day is `23:59`, `from` is less than `to`, and a window across midnight is split in two.
+  A whole day is `00:00` to `00:00` or `00:00` to `23:59`, kept as the source writes it.
 - **Reading:** sources may follow 1.0.0 or 1.0.1. The repairs in
   [`engine/core/normalizers/static-vse.ts`](../../engine/core/normalizers/static-vse.ts) write `So` as
   `Su`, and the 1.0.1 rules are looser in every other point, so a 1.0.0 file needs no other change. The

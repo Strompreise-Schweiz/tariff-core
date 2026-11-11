@@ -8,13 +8,15 @@ import { excludeBrokenTariffs } from "./core/exclusion.ts";
 import { deepEqual, toJson } from "./core/json.ts";
 import { repairStatic, type RepairedDocument } from "./core/normalizers/static-vse.ts";
 import { applyWaivers, documentIssues } from "./core/rules.ts";
+import { VSE_VERSIONS } from "./core/vse.ts";
 import { formatTimestamp, zurichDate } from "./core/time.ts";
 import type { Curation, Repair, SourceConfig, StaticSource, Tariff, TariffDocument } from "./core/types.ts";
+import engine from "../package.json" with { type: "json" };
 import { annotate, NO_UTILITY, parseCli, report } from "./lib/cli.ts";
 import { exists, parseJson, readJson, readJsonIfExists, writeFile, writeJson } from "./lib/files.ts";
 import { http } from "./lib/http.ts";
 import { loadConfig, now, SCHEMA_BASE, utilityRoots } from "./lib/repo.ts";
-import { writeConformance } from "./lib/conformance.ts";
+import { checkAllVersions, writeConformance } from "./lib/conformance.ts";
 import { writeIndex } from "./lib/site-index.ts";
 import { writeStatus, yearStatus, type YearStatus } from "./lib/status.ts";
 
@@ -39,6 +41,10 @@ and data/tariffs/<year>.report.json explains what is wrong.
 `;
 
 type Origin = TariffDocument["_meta"]["source"][number];
+
+// The files of this project follow this version of the VSE definition. Sources may follow any.
+const WRITTEN_VSE_VERSION = "1.0.1";
+const GENERATOR = { name: "tariff-core", version: engine.version, url: "https://github.com/Strompreise-Schweiz/tariff-core" };
 type RepairedTariff = RepairedDocument["tariffs"][number];
 
 /** The source bytes and where they came from. */
@@ -50,7 +56,15 @@ async function readSource(root: string, source: StaticSource, offline: boolean):
   else throw new Error("the source needs url or file");
   if (!offline) writeFile(rawPath, data);
   const sha256 = createHash("sha256").update(data).digest("hex");
-  const origin = source.file ? { name: source.name, file: source.file, sha256 } : { name: source.name, url: source.url, sha256 };
+  let conformsTo: string[] = [];
+  try {
+    const results = checkAllVersions(parseJson(data));
+    conformsTo = VSE_VERSIONS.filter((version) => results[version].valid);
+  } catch { // not JSON: reported when the source is repaired
+  }
+  const origin = source.file
+    ? { name: source.name, file: source.file, sha256, conformsTo }
+    : { name: source.name, url: source.url, sha256, conformsTo };
   return { data, origin };
 }
 
@@ -114,6 +128,8 @@ export async function publish(root: string, offline = false): Promise<number> {
       dsoNumber: collected.dsoNumber!,
       _meta: {
         schemaVersion: "1.0",
+        vseVersion: WRITTEN_VSE_VERSION,
+        generator: GENERATOR,
         year,
         generatedAt,
         source: collected.origins,

@@ -1,6 +1,6 @@
 {
   "name": "@strompreise-schweiz/tariff-core",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "description": "Schemas, engine and reusable workflows of Strompreise Schweiz",
   "license": "MIT",

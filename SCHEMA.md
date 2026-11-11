@@ -72,7 +72,7 @@ Schema: [`schemas/tariff-document/v1.schema.json`](schemas/tariff-document/v1.sc
 
 ```jsonc
 {
-  "dsoName": "EKZ",                 // VSE
+  "dsoName": "EKZ",                 // VSE 1.0.1
   "dsoNumber": 10153012345,         // VSE
   "tariffs": [{                     // VSE, unknown source fields are kept
     "id": "grid-ekz-netz-400st-ne7",  // ADDED: stable key, tariffName is not unique
@@ -110,6 +110,12 @@ Schema: [`schemas/tariff-document/v1.schema.json`](schemas/tariff-document/v1.sc
   }
 }
 ```
+
+`_meta` says how the file was made: `vseVersion` (the VSE definition it follows, 1.0.1), `generator`
+(the engine and its version), `source` (the files of the utility, with `sha256` and `conformsTo`, the
+VSE versions each followed as published), `repairs` (every change to the source), `overrides`
+(corrections from `curation/<year>.json`), `issues` (warnings) and `excluded` (tariffs left out, with
+the reason). `schemaVersion` is the version of the format of this project, not of the VSE definition.
 
 Several parallel variants of a tariff, such as EKZ grid clusters, are separate tariffs and products,
 each with its own URL. See `docs/decisions.md`.

@@ -85,10 +85,16 @@ export interface TariffDocument {
   dsoName: string;
   dsoNumber: number;
   _meta: {
+    /** Version of the format of this project. */
     schemaVersion: string;
+    /** Version of the VSE OpenAPI definition the file follows. */
+    vseVersion?: string;
+    /** The engine that wrote the file, such as tariff-core 3.1.0. */
+    generator?: { name: string; version: string; url: string };
     year: number;
     generatedAt?: string;
-    source: { name: string; url?: string; file?: string; sha256: string }[];
+    /** The files of the utility. conformsTo lists the VSE versions a source follows as published. */
+    source: { name: string; url?: string; file?: string; sha256: string; conformsTo?: string[] }[];
     pricesExcludeVat?: boolean;
     repairs: Repair[];
     overrides: AppliedCuration[];

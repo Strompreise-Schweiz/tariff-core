@@ -33,7 +33,8 @@ The workspace folder holds all repos side by side:
   written in 1.0.1, sources in 1.0.0 are read and converted (`So` becomes `Su`).
 - Tariff forms: `constant`, `multilevel`, `dynamic`.
 - Tariff types: `electricity`, `grid`, `metering`, `regional_fees`.
-- Static prices exclude VAT. Price windows are Swiss wall-clock time.
+- Static prices exclude VAT. Price windows are Swiss wall-clock time, written as in VSE 1.0.1: the
+  day ends at `23:59`, `from` < `to`, a window across midnight is split in two.
 - Dynamic timestamps are Swiss local time with an offset. A day has 23, 24 or 25 hours, so do not
   hardcode 96 intervals.
 - Sources deviate from the standard. Add repairs to `engine/core/normalizers/static-vse.ts`, log each one,
