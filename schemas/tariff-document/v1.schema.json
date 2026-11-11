@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/tariff-document/v1.schema.json",
   "title": "Static tariff document",
-  "description": "VSE TariffSubmission (OpenAPI 1.0.0, NNMV annex 10) with additive fields: tariffs[].id, products and _meta. A consumer of the VSE format can read this file unchanged.",
+  "description": "VSE TariffSubmission (OpenAPI 1.0.1) with additive fields: tariffs[].id, products and _meta. A consumer of the VSE format can read this file unchanged.",
   "type": "object",
   "required": [
     "dsoName",
@@ -70,6 +70,10 @@
           "type": "integer",
           "minimum": 2,
           "maximum": 7
+        },
+        "standardBasegroup": {
+          "type": "boolean",
+          "default": false
         },
         "tariffName": {
           "type": "string",
@@ -198,6 +202,7 @@
             "CHF/kWh",
             "CHF/kW",
             "CHF/kW/M",
+            "CHF/kW/Y",
             "CHF/kVarh",
             "CHF/M",
             "CHF"
@@ -208,7 +213,6 @@
     "TimeBasedPrice": {
       "type": "object",
       "required": [
-        "weekdays",
         "from",
         "to",
         "price",
@@ -250,7 +254,7 @@
               "Th",
               "Fr",
               "Sa",
-              "So"
+              "Su"
             ]
           }
         },
@@ -271,6 +275,7 @@
             "CHF/kWh",
             "CHF/kW",
             "CHF/kW/M",
+            "CHF/kW/Y",
             "CHF/kVarh",
             "CHF/M",
             "CHF"

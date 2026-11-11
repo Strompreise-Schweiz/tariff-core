@@ -131,3 +131,15 @@ test("the site of an org repo serves the current archive year only", () => {
     .filter((e) => e.isFile()).map((e) => path.relative(site, path.join(e.parentPath, e.name))).sort();
   assert.deepEqual(served, ["dynamic/grid-d/latest.json", "dynamic/grid-d/vse/2027/2027-01-05.json", "index.json", "tariffs/2026.json"]);
 });
+
+test("the hub site has the status page, and each utility a status.json", async () => {
+  const hub = makeHub();
+  const root = addUtility(hub, "alpha");
+  await publish(root);
+  const status = readJsonFile(path.join(root, "data/status.json"));
+  assert.deepEqual(status.years.map((y: Obj) => [y.year, y.blocked, y.online, y.errors]), [[2026, false, true, 0]]);
+  assert.deepEqual(Object.keys(status.vse.sources[0]), ["name", "1.0.0", "1.0.1"]);
+  assert.equal(buildSite(hub, path.join(hub, "_site")), 0);
+  assert.ok(existsSync(path.join(hub, "_site/status.html")));
+  assert.ok(existsSync(path.join(hub, "_site/alpha/status.json")));
+});

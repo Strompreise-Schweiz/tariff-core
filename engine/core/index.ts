@@ -7,3 +7,4 @@ export { applyCuration, assignIds } from "./curation.ts";
 export { suggestProducts } from "./products.ts";
 export { repairStatic } from "./normalizers/static-vse.ts";
 export { applyWaivers, coverageProblems, documentIssues, dynamicDayIssues, hubIssues, schemaIssues, tariffIssues } from "./rules.ts";
+export { VSE_VERSIONS, vseValidator, type Conformance, type OpenApiDocument, type VseVersion } from "./vse.ts";

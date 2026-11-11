@@ -1,12 +1,13 @@
 # Notes on the VSE documents
 
-Own summary. The original documents are not redistributed here.
+Own summary. The OpenAPI definitions are in [`schemas/vse/`](../schemas/vse/), with a table of what
+changed between versions. The PDF documents are not redistributed here.
 
 ## Sources
 
 | Document | Content |
 |---|---|
-| OpenAPI definition, [strom.ch/api-tariff-definition](https://www.strom.ch/api-tariff-definition) | Static tariffs, **binding** |
+| OpenAPI definition 1.0.0 and 1.0.1, [strom.ch/api-tariff-definition](https://www.strom.ch/api-tariff-definition), copies in [`schemas/vse/`](../schemas/vse/) | Static tariffs, **binding** |
 | NNMV 2025, annex 10 and chapter 7.3 | Static tariffs, example is illustrative only |
 | FAQ machine-readable tariffs (2025) | Interpretations, states that OpenAPI is binding |
 | HDN 2025, chapter 7 | Dynamic tariffs: API format and query parameters |
@@ -27,8 +28,8 @@ There is no legal requirement for a machine-readable electricity label (EKZ, Jan
 | Base price | Object with unit | Number | Object at EKZ | Repaired |
 | Energy | `prices.energy` | Nested `prices`, sometimes `prices.grid` | Direct list at EKZ | Repaired |
 | Day | `weekdays` | `day: "*"` | `weekdays` at EKZ | Repaired |
-| Sunday | `So` | `su` | `Su` at EKZ | Repaired to `So` |
-| End of day | `00:00` (FAQ) | `00:00` | `23:59` at EKZ | Repaired to `00:00` |
+| Sunday | `So`, `Su` from 1.0.1 | `su` | `Su` at EKZ | Written as `Su` (1.0.1) |
+| End of day | `00:00` (FAQ), `23:59` from 1.0.1 | `00:00` | `23:59` at EKZ | Repaired to `00:00` |
 | Refund | `prices.refundStorage` positive | `tariffType: refund` negative | `refundStorage` at EKZ | Repaired |
 | Type | Enum | `" regional_fees "` with spaces | | Repaired |
 | Voltage level | 2 to 7 | 2 to 7 | 0 at EW Uznach | Blocked, needs curation |
@@ -37,7 +38,7 @@ There is no legal requirement for a machine-readable electricity label (EKZ, Jan
 | Several years | Not addressed | One document per utility | 2026 and 2027 in one file at EKZ | Split by year |
 | Municipality no. | 5 digits | `352` | `12389` at EKZ | Any positive integer allowed |
 | Extra fields | Allowed | | `standardBasegroup`, `url` at EKZ | Kept |
-| Voltage level missing | Required | | Absent on 10 of 22 EKZ tariffs for 2027 (electricity, metering, fees) | Warning, not invented |
+| Voltage level missing | Required, from 1.0.1 for `grid` only | | Absent on 10 of 22 EKZ tariffs for 2027 (electricity, metering, fees) | Error for `grid`, otherwise allowed, never invented |
 | Same name | "Should be unique" | Repeated across types | Repeated at EKZ | Own `id` |
 
 ## Dynamic tariffs

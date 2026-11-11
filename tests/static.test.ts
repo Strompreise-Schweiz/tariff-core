@@ -50,10 +50,18 @@ const codes = (issues: Issue[]) => new Set(issues.map((i) => i.code));
 test("real shape passes with repairs logged", () => {
   const [document, issues] = build(ekzLike());
   assert.deepEqual(errors(issues), []);
-  assert.deepEqual(new Set(document._meta.repairs.map((r: Obj) => r.code)), new Set(["end_of_day_to_midnight", "weekday_spelling"]));
+  assert.deepEqual(new Set(document._meta.repairs.map((r: Obj) => r.code)), new Set(["end_of_day_to_midnight"]));
   const energy = document.tariffs[0].prices.energy[0];
   assert.equal(energy.to, "00:00");
-  assert.ok(energy.weekdays.includes("So"));
+  assert.ok(energy.weekdays.includes("Su"));
+});
+
+test("Sunday from VSE 1.0.0 is written as Su", () => {
+  const raw = ekzLike();
+  raw.tariffs[0].prices.energy[0].weekdays = ["Sa", "So"];
+  const [document] = build(raw);
+  assert.deepEqual(document.tariffs[0].prices.energy[0].weekdays, ["Sa", "Su"]);
+  assert.ok(document._meta.repairs.some((r: Obj) => r.code === "weekday_spelling"));
 });
 
 test("unknown source fields survive", () => {
@@ -161,7 +169,7 @@ test("a weekend low tariff covers the week", () => {
   const entries = [
     price(0.1, { weekdays: weekday, from: "07:00", to: "20:00" }),
     price(0.05, { weekdays: weekday, from: "20:00", to: "07:00" }),
-    price(0.05, { weekdays: ["Sa", "So"] }),
+    price(0.05, { weekdays: ["Sa", "Su"] }),
   ];
   assert.deepEqual(coverageProblems(entries as TimePrice[]), { gaps: [], overlaps: [] });
 });
@@ -263,13 +271,24 @@ function ekz2027Like(): Obj {
   return raw;
 }
 
-test("a missing voltage level warns and is not invented", () => {
+test("only a grid tariff needs a voltage level, and none is invented", () => {
   const [document, issues] = build(ekz2027Like());
   assert.deepEqual(errors(issues), []);
-  assert.ok(codes(issues).has("missing_voltage_level"));
+  assert.ok(!codes(issues).has("missing_voltage_level"));
   const energy = document.tariffs.find((t: Obj) => t.tariffType === "electricity");
   assert.ok(!("customerVoltageLevel" in energy));
   assert.equal(energy.id, "electricity-energie-dynamisch");
+  const raw = ekz2027Like();
+  delete raw.tariffs.find((t: Obj) => t.tariffType === "grid").customerVoltageLevel;
+  assert.ok(codes(errors(build(raw)[1])).has("missing_voltage_level"));
+});
+
+test("only one standard tariff per type", () => {
+  const [, issues] = build(ekzLike());
+  assert.ok(codes(issues).has("several_standard_tariffs"));
+  const raw = ekzLike();
+  for (const tariff of raw.tariffs) tariff.standardBasegroup = tariff.tariffName === "Netz 400ST";
+  assert.ok(!codes(build(raw)[1]).has("several_standard_tariffs"));
 });
 
 test("each cluster becomes its own product", () => {

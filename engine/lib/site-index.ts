@@ -36,6 +36,8 @@ export function writeIndex(root: string, org: SourceConfig): void {
       current: exists(path.join(tariffsDir, "current.json")) ? rawUrl(root, slug, "data/tariffs/current.json") : null,
       years: Object.fromEntries(years.map((year) => [year, rawUrl(root, slug, `data/tariffs/${year}.json`)])),
     },
+    vse_conformance: exists(path.join(root, "data", "vse-conformance.json")) ? rawUrl(root, slug, "data/vse-conformance.json") : null,
+    status: exists(path.join(root, "data", "status.json")) ? rawUrl(root, slug, "data/status.json") : null,
     dynamic,
   });
   const file = path.join(root, "data", "index.json");

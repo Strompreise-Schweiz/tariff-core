@@ -11,14 +11,14 @@ import type { DynamicDay, Issue, Month, Severity, SourceConfig, Tariff, TariffDo
 export { schemaIssues } from "./schemas.ts";
 
 export const MONTHS: Month[] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-export const WEEKDAYS: Weekday[] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "So"];
+export const WEEKDAYS: Weekday[] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const TIME_FIELDS = ["energy", "power", "reactivePower"] as const;
 // Above this a price was probably entered in Rappen instead of francs.
 const MAX_PLAUSIBLE_CHF_KWH = 1.5;
 const ALLOWED_UNITS: Record<string, string[]> = {
   base: ["CHF/M"],
   energy: ["CHF/kWh"],
-  power: ["CHF/kW", "CHF/kW/M"],
+  power: ["CHF/kW", "CHF/kW/M", "CHF/kW/Y"],
   reactivePower: ["CHF/kVarh"],
 };
 const MINUTES_PER_DAY = 1440;
@@ -50,7 +50,7 @@ export function coverageProblems(entries: TimePrice[]): { gaps: string[]; overla
   for (const entry of entries) {
     const ranges = windowRanges(entry.from, entry.to);
     for (const month of entry.months?.length ? entry.months : MONTHS) {
-      for (const day of entry.weekdays.length ? entry.weekdays : WEEKDAYS) {
+      for (const day of entry.weekdays?.length ? entry.weekdays : WEEKDAYS) {
         const minuteCounts = counts.get(`${month}/${day}`);
         if (!minuteCounts) continue; // an unknown month or weekday is a schema error
         for (const [from, to] of ranges) for (let minute = from; minute < to; minute++) minuteCounts[minute] += 1;
@@ -67,10 +67,10 @@ export function coverageProblems(entries: TimePrice[]): { gaps: string[]; overla
 export function tariffIssues(tariff: Tariff, year: number): Issue[] {
   const issues: Issue[] = [];
   const add = (severity: Severity, code: string, message: string) => issues.push(issue(severity, code, message, tariff.id));
-  if (tariff.customerVoltageLevel === undefined) {
-    // Required by the OpenAPI, but EKZ omits it where a tariff is not tied to a level.
-    // Guessing a level would be inventing data, so this is reported and not blocked.
-    add("warning", "missing_voltage_level", "the source states no voltage level");
+  if (tariff.customerVoltageLevel === undefined && tariff.tariffType === "grid") {
+    // VSE 1.0.1 requires it for grid tariffs only. Guessing a level would be inventing data:
+    // set it in curation/<year>.json from the price sheet.
+    add("error", "missing_voltage_level", "a grid tariff needs customerVoltageLevel");
   }
   const { prices, tariffForm: form } = tariff;
   const energy = prices.energy ?? [];
@@ -88,7 +88,7 @@ export function tariffIssues(tariff: Tariff, year: number): Issue[] {
       const values = prices[field] ?? [];
       if (values.length > 1) add("error", "constant_with_several_prices", `${field} has ${values.length} entries`);
       for (const value of values) {
-        if (value.months?.length || value.weekdays.length || value.from !== value.to) {
+        if (value.months?.length || value.weekdays?.length || value.from !== value.to) {
           add("error", "constant_with_time_window", `${field} applies only part of the time`);
         }
       }
@@ -126,6 +126,12 @@ export function documentIssues(document: TariffDocument, year: number, vseId?: s
     if (members.length > 1) issues.push(issue("warning", "indistinguishable_tariffs", `${members.length} tariffs share ${key}`));
   }
   if (byId.size !== document.tariffs.length) issues.push(issue("error", "duplicate_tariff_id", "tariff ids are not unique"));
+  for (const type of ["electricity", "grid"]) {
+    const standard = document.tariffs.filter((t) => t.tariffType === type && t.standardBasegroup === true);
+    if (standard.length > 1) {
+      issues.push(issue("warning", "several_standard_tariffs", `${standard.length} ${type} tariffs have standardBasegroup, VSE 1.0.1 allows one`));
+    }
+  }
   for (const product of document.products) {
     const add = (code: string, message: string) => issues.push(issue("error", code, message, product.id));
     const levels = new Set<number>();

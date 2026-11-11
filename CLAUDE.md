@@ -27,8 +27,10 @@ The workspace folder holds all repos side by side:
 
 ## Domain rules
 
-- The binding format is the VSE OpenAPI definition, see `docs/vse-notes.md`. Own additions are only
-  additive, so a published file stays a valid VSE file.
+- The binding format is the VSE OpenAPI definition. The versions are in `schemas/vse/`, the differences
+  to real files in `docs/vse-notes.md`. Own additions are only additive, so a published file stays a
+  valid VSE file. `data/vse-conformance.json` shows per utility which versions its files follow. Own files are
+  written in 1.0.1, sources in 1.0.0 are read and converted (`So` becomes `Su`).
 - Tariff forms: `constant`, `multilevel`, `dynamic`.
 - Tariff types: `electricity`, `grid`, `metering`, `regional_fees`.
 - Static prices exclude VAT. Price windows are Swiss wall-clock time.

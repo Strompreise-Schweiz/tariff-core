@@ -34,6 +34,38 @@ folder under `https://data.strompreise-schweiz.ch/<slug>/`, with the dynamic arc
 
 The fixed parts of a dynamic tariff (`base`, `refundStorage`) stay in the yearly file.
 
+## Status: `data/status.json` and `/status.html`
+
+`data/status.json` summarizes the checks of one utility: per year whether it is published or blocked,
+the number of errors, warnings and accepted issues per code, and the VSE results. It is written when
+static tariffs are published. The hub site serves [`/status.html`](site/status.html), which reads the
+`status.json` and `latest.json` files of every utility and shows them in one table.
+
+## VSE conformance: `data/vse-conformance.json`
+
+Whether the files follow the [OpenAPI definitions of the VSE](schemas/vse/), checked for every
+version when static tariffs are published. Information only, it does not block publication.
+
+```jsonc
+{
+  "definitions": { "1.0.0": "<url>", "1.0.1": "<url>" },
+  "sources": [{                     // the files as the utility published them
+    "name": "ekz-all", "url": "...", "sha256": "...",
+    "results": {
+      "1.0.0": { "valid": false, "errors": 44, "summary": [
+        { "path": "tariffs/*/prices/energy/*/weekdays/*", "message": "must be equal to one of the allowed values: Mo, Tu, We, Th, Fr, Sa, So", "count": 23 }
+      ] },
+      "1.0.1": { "valid": true, "errors": 0, "summary": [] }
+    }
+  }],
+  "published": [{ "file": "tariffs/2026.json", "results": { ... } }]   // the files of this project
+}
+```
+
+`summary` groups the errors by rule and path, with array indices as `*`, and lists the ten most
+frequent groups. `data/badges/vse-<version>.json` holds the result for the sources in the
+[shields.io endpoint format](https://shields.io/badges/endpoint-badge), for a badge in a README.
+
 ## Static: `data/tariffs/<year>.json`
 
 Schema: [`schemas/tariff-document/v1.schema.json`](schemas/tariff-document/v1.schema.json).

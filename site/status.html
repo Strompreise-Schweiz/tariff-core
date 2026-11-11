@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status – Strompreise Schweiz</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e3e3; --head: #f6f8fa;
+    --ok: #1a7f37; --ok-bg: #dafbe1; --bad: #c62828; --bad-bg: #ffebe9; --warn: #9a6700; --warn-bg: #fff8c5;
+    --none: #5f6368; --none-bg: #eef0f2; --link: #0969da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #30363d; --head: #161b22;
+      --ok: #3fb950; --ok-bg: #12261e; --bad: #f85149; --bad-bg: #2d1416; --warn: #d29922; --warn-bg: #2b2111;
+      --none: #9198a1; --none-bg: #21262d; --link: #4493f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  p { margin: 4px 0 12px; color: var(--muted); }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { background: var(--head); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .where { display: block; color: var(--muted); font-size: 12px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; margin: 0 4px 4px 0; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .bad { color: var(--bad); background: var(--bad-bg); }
+  .warn { color: var(--warn); background: var(--warn-bg); }
+  .none { color: var(--none); background: var(--none-bg); }
+  .line { margin-bottom: 6px; }
+  .line:last-child { margin-bottom: 0; }
+  .label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  details { font-size: 12px; color: var(--muted); }
+  summary { cursor: pointer; }
+  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .legend { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .legend li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Status of all utilities</h1>
+  <p>What the checks of <a href="https://github.com/Strompreise-Schweiz/tariff-core">tariff-core</a> found, read live from the published files. <span id="updated"></span></p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Utility</th>
+          <th>Static tariffs</th>
+          <th>File of the utility vs. VSE</th>
+          <th>Files of this project vs. VSE</th>
+          <th>Dynamic tariffs</th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <ul class="legend">
+    <li><b>Static tariffs:</b> per year whether it is published, and the issues the checks found. A blocked year keeps the previous file online.</li>
+    <li><b>VSE:</b> whether a file follows the <a href="https://github.com/Strompreise-Schweiz/tariff-core/tree/main/schemas/vse">OpenAPI definitions of the VSE</a>, version 1.0.0 and 1.0.1. Information only, it does not block publication.</li>
+    <li><b>Dynamic tariffs:</b> the days in <code>latest.json</code> and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
+  </ul>
+</main>
+<script>
+"use strict";
+const VERSIONS = ["1.0.0", "1.0.1"];
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich" }).format(new Date());
+
+/** Create an element. Text is always set as text, never as HTML. */
+function h(tag, attributes, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attributes ?? {})) node.setAttribute(key, value);
+  for (const child of children.flat()) if (child !== null && child !== undefined && child !== false) node.append(child);
+  return node;
+}
+const chip = (kind, text, title) => h("span", { class: `chip ${kind}`, ...(title ? { title } : {}) }, text);
+const link = (href, text) => h("a", { href }, text);
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+async function getJson(url) {
+  try {
+    const response = await fetch(url, { cache: "no-cache" });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+function staticCell(slug, status) {
+  if (!status) return chip("none", "no status yet", "status.json is written when static tariffs are published");
+  if (!status.years.length) return chip("none", "no static source");
+  return status.years.map((year) => {
+    const codes = Object.entries(year.codes);
+    const state = year.blocked
+      ? chip("bad", `${year.year} blocked`, year.online ? "The previous file stays online" : "No file online")
+      : chip("ok", `${year.year} published`);
+    const counts = [
+      year.errors ? link(`/${slug}/tariffs/${year.year}.report.json`, plural(year.errors, "error")) : null,
+      year.warnings ? `${plural(year.warnings, "warning")}` : null,
+      year.accepted ? `${year.accepted} accepted` : null,
+    ].filter(Boolean);
+    return h("div", { class: "line" },
+      year.online && !year.blocked ? h("a", { href: `/${slug}/tariffs/${year.year}.json` }, state) : state,
+      counts.length ? h("span", { class: "label" }, ...counts.flatMap((c, i) => (i ? [", ", c] : [c]))) : null,
+      codes.length ? h("details", null, h("summary", null, "issue codes"),
+        h("div", null, ...codes.flatMap(([code, n], i) => [i ? ", " : "", h("code", null, code), ` ${n}`]))) : null);
+  });
+}
+
+function vseLine(label, results, href) {
+  return h("div", { class: "line" }, h("span", { class: "label" }, label),
+    ...VERSIONS.map((version) => {
+      const r = results[version];
+      const kind = r.valid ? "ok" : "bad";
+      const text = r.valid ? `${version} valid` : `${version} ${plural(r.errors, "error")}`;
+      return h("a", { href }, chip(kind, text));
+    }));
+}
+
+function vseCell(slug, status, part) {
+  if (!status) return chip("none", "no status yet");
+  const files = status.vse[part];
+  if (!files.length) return chip("none", part === "sources" ? "no source file" : "no file");
+  return files.map((f) => vseLine(part === "sources" ? f.name : f.file.replace("tariffs/", ""), f, `/${slug}/vse-conformance.json`));
+}
+
+async function dynamicCell(slug, index) {
+  const tariffs = index?.dynamic ?? [];
+  if (!tariffs.length) return chip("none", "none");
+  const lines = await Promise.all(tariffs.map(async (tariff) => {
+    const latest = await getJson(`/${slug}/dynamic/${tariff.id}/latest.json`);
+    const days = latest?._meta?.days ?? [];
+    const hasToday = days.some((d) => d.date === today);
+    return h("div", { class: "line" }, h("span", { class: "label" }, tariff.name ?? tariff.id),
+      hasToday ? null : chip("bad", "today missing"),
+      ...days.map((d) => chip(d.complete ? "ok" : "warn", `${d.date.slice(5)} ${d.complete ? "complete" : "incomplete"}`)));
+  }));
+  return lines;
+}
+
+async function row(utility) {
+  const { slug } = utility;
+  const [status, index] = await Promise.all([getJson(`/${slug}/status.json`), getJson(`/${slug}/index.json`)]);
+  return h("tr", null,
+    h("td", null, h("a", { href: utility.repository }, utility.name), h("span", { class: "where" }, utility.maintained_in === "hub" ? "hub repo" : "own repo")),
+    h("td", null, staticCell(slug, status)),
+    h("td", null, vseCell(slug, status, "sources")),
+    h("td", null, vseCell(slug, status, "published")),
+    h("td", null, await dynamicCell(slug, index)));
+}
+
+(async () => {
+  const body = document.getElementById("rows");
+  const overall = await getJson("/index.json");
+  if (!overall) {
+    body.replaceChildren(h("tr", null, h("td", { colspan: "5" }, "Could not read /index.json.")));
+    return;
+  }
+  const rows = await Promise.all(overall.utilities.map(row));
+  body.replaceChildren(...rows);
+  document.getElementById("updated").textContent = `Swiss date: ${today}.`;
+})();
+</script>
+</body>
+</html>

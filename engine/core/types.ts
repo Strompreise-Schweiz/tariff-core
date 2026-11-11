@@ -1,7 +1,7 @@
 /** Types of the files this project reads and writes. The JSON schemas in schemas/ are binding. */
 
 export type Month = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec";
-export type Weekday = "Mo" | "Tu" | "We" | "Th" | "Fr" | "Sa" | "So";
+export type Weekday = "Mo" | "Tu" | "We" | "Th" | "Fr" | "Sa" | "Su";
 export type TariffType = "electricity" | "grid" | "metering" | "regional_fees";
 export type TariffForm = "constant" | "multilevel" | "dynamic";
 
@@ -17,8 +17,8 @@ export interface SimplePrice extends Open {
 }
 
 export interface TimePrice extends SimplePrice {
-  months: Month[] | null;
-  weekdays: Weekday[];
+  months?: Month[] | null;
+  weekdays?: Weekday[] | null;
   from: string;
   to: string;
 }
@@ -39,7 +39,10 @@ export interface Tariff extends Open {
   tariffName: string;
   tariffType: TariffType;
   tariffForm: TariffForm;
+  /** Required for grid tariffs since VSE 1.0.1. */
   customerVoltageLevel?: number;
+  /** The standard tariff of the basic customer group, at most one per electricity and grid. VSE 1.0.1. */
+  standardBasegroup?: boolean;
   customerType: string;
   startDate: string;
   endDate: string;

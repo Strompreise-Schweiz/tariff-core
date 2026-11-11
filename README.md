@@ -66,6 +66,7 @@ engine/
   core/        runs in Node and in the browser: types, repairs, curation, products, validation
   lib/         Node only: files, repo layout and URLs, HTTP, command line
   *.ts         the scripts the workflows run
+site/          status.html, served by the hub site at data.strompreise-schweiz.ch/status.html
 ```
 
 A website imports [`engine/core/index.ts`](engine/core/index.ts) to check a file with the same rules

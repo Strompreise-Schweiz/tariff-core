@@ -1,0 +1,304 @@
+openapi: 3.0.3
+info:
+  title: Tariff Retrieval API
+  version: 1.0.1
+  description: API to retrieve tariff structures for electricity services by DSO.
+
+paths:
+  /tariffs:
+    get:
+      summary: Get DSO tariff information
+      responses:
+        '200':
+          description: Tariff data successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TariffSubmission'
+        '404':
+          description: DSO or tariffs not found
+        '500':
+          description: Server error
+
+components:
+  schemas:
+    TariffSubmission:
+      type: object
+      required:
+        - dsoName
+        - dsoNumber
+        - tariffs
+      properties:
+        dsoName:
+          type: string
+          description: grid operator name
+        dsoNumber:
+          type: integer
+          format: int64
+          description: VSE/AES grid operator identification (11 digits)
+          minimum: 10000000000
+          maximum: 99999999999
+        tariffs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tariff'
+
+    Tariff:
+      type: object
+      required:
+        - tariffName
+        - tariffType
+        - tariffForm
+        - startDate
+        - endDate
+        - customerType
+        - prices
+      properties:
+        customerVoltageLevel:
+          type: integer
+          description: End customers voltage level to which the tariff applies (from 2 to 7). Required for tariffType "grid"
+          minimum: 2
+          maximum: 7
+        tariffName:
+          type: string
+          description: |
+            Name of the tariff, which should be unique within the DSO
+        tariffType:
+          type: string
+          enum:
+            - electricity
+            - grid
+            - metering
+            - regional_fees
+          description: |
+            Possible values:
+              - electricity: Electricity energy supply to end consumers
+              - grid: Grid usage (distribution and transmission networks) including general and individual system services, grid surcharge according to Art. 35 EnG + electricity reserve + socialized costs via the transmission grid
+              - metering: Charges for measurement infrastructure
+              - regional_fees: Local or regional surcharges (e.g., concession fees)
+        standardBasegroup:
+          type: boolean
+          default: false
+          description: |
+            Indicates whether this tariff is the standard tariff for the basic customer group.
+            Only one tariff per tariffType (electricity or grid) may have this flag set to true.
+            If not applicable (e.g. metering or regional_fees), this field should be false.
+            Defaults to false if not specified.
+        tariffForm:
+          type: string
+          enum: ["constant", "multilevel", "dynamic"]
+          description: |
+            Possible values:
+              - constant: A uniform price applied across all consumption (flat rate per unit)
+              - multilevel: A tiered or block tariff with different rates for defined consumption months, days and times.
+              - dynamic: A price that varies over time, typically based on market signals.
+        startDate:
+          type: string
+          format: date
+          description: |
+            Start date of the tariff validity period in ISO 8601 format (YYYY-MM-DD).
+            The tariff is valid from this date until the endDate.
+        endDate:
+          type: string
+          format: date
+          description: |
+            End date of the tariff validity period in ISO 8601 format (YYYY-MM-DD).
+            The tariff is valid until this date
+        comment:
+          type: string
+          description: |
+            Provides additional descriptive information about the tariff:
+              - Can include contextual notes or special conditions.
+              - Useful for human interpretation (e.g. "Metering fee per meter per month").
+              - Not intended for automated processing or validation.
+              - Optional field, may be left empty if no comment is needed.
+        customerType:
+          type: string
+          description: Customer group to which the tariff applies
+        prices:
+          type: object
+          properties:
+            base:
+              allOf:
+                - $ref: '#/components/schemas/SimplePrice'
+              description: |
+                Base price for the tariff. Price Unit: CHF/M
+            energy:
+              type: array
+              description: |
+                Energy price as a time-based price with unit CHF/kWh. Constant energy prices are defined as a single entry with empty months, weekdays, from "00:00" and to "00:00".
+              items:
+                $ref: '#/components/schemas/TimeBasedPrice'
+            power:
+              type: array
+              items:
+                $ref: '#/components/schemas/TimeBasedPrice'
+              description: |
+                Power price as a time-based price with unit CHF/kW/M or CHF/kW/Y. Constant power prices are defined as a single entry with empty months, weekdays, from "00:00" and to "00:00".
+            reactivePower:
+              type: array
+              items:
+                $ref: '#/components/schemas/TimeBasedPrice'
+              description: |
+                Price for the reactive power as a time-based price with unit CHF/kVarh. Constant reactive power prices are defined as a single entry with empty months, weekdays, from "00:00" and to "00:00".
+            refundStorage:
+              allOf:
+                - $ref: '#/components/schemas/SimplePrice'
+              description: |
+                Price for refund of grid usage for storage facilities with end consumption. The price must be given as a positive number. Price Unit: CHF/kWh
+            dynamic:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+              example: "https://api.tariffs.groupe-e.ch/v1/tariffs"
+              description: |
+                URL to the dynamic energy tariff information. This is required for dynamic tariffs.
+            municipalityTaxes:
+              type: array
+              items:
+                $ref: '#/components/schemas/MunicipalityTaxPrice'
+              description: |
+                Municipality-specific taxes and fees that apply to the grid tariff.
+            cantonalTaxes:
+              type: array
+              items:
+                $ref: '#/components/schemas/CantonalTaxPrice'
+              description: |
+                Cantonal-specific taxes and fees that apply to the grid tariff.
+    SimplePrice:
+      type: object
+      required: [price, priceUnit]
+      properties:
+        price:
+          type: number
+          description: Price without VAT-taxes
+          minimum: 0
+        priceUnit:
+          type: string
+          enum: ["CHF/kWh", "CHF/kW", "CHF/kW/M", "CHF/kW/Y", "CHF/kVarh", "CHF/M", "CHF"]
+          description: |
+            Unit in which the price is expressed. Common units include:
+              - CHF/kWh: Swiss francs per kilowatt-hour (used for energy consumption)
+              - CHF/kW: Swiss francs per kilowatt (one-time or capacity-based power charges for the whole time between tariff startDate and endDate)
+              - CHF/kW/M: Swiss francs per kilowatt per month (used for grid power fees)
+              - CHF/kW/Y: Swiss francs per kilowatt per year (used for grid power fees)
+              - CHF/kVarh: Swiss francs per kilovar-hour (used for reactive energy billing)
+              - CHF/M: Swiss francs per month (e.g. fixed base fees)
+              - CHF: Swiss francs per month (one-time charges for the whole time between tariff startDate and endDate)
+
+            Note: Units should be consistent across tariffs and follow Swiss market standards.
+    TimeBasedPrice:
+      type: object
+      required: [from, to, price, priceUnit]
+      properties:
+        months:
+          type: array
+          nullable: true
+          items:
+            type: string
+            enum: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+          description: |
+            Specifies the months when this price applies.
+            If empty, the price is valid for all months in the tariff period (startDate, endDate).
+        weekdays:
+          type: array
+          nullable: true
+          items:
+            type: string
+            enum: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+          description: |
+            Specifies the days of the week when this price applies.
+            If empty, the price is valid for all days of the week.
+        from:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: "08:00"
+          description: Time in 24-hour format (HH:MM). Must be less than the "to" time. "00:00" indicates the start of the day.
+        to:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: "20:00"
+          description: Time in 24-hour format (HH:MM). Must be greater than the "from" time. "23:59" indicates the end of the day.
+        price:
+          type: number
+          description: Price without VAT-taxes
+          minimum: 0
+        priceUnit:
+          type: string
+          enum: ["CHF/kWh", "CHF/kW", "CHF/kW/M", "CHF/kW/Y", "CHF/kVarh", "CHF/M", "CHF"]
+          description: |
+            Unit in which the price is expressed. Common units include:
+              - CHF/kWh: Swiss francs per kilowatt-hour (used for energy consumption)
+              - CHF/kW: Swiss francs per kilowatt (one-time or capacity-based power charges for the whole time between tariff startDate and endDate)
+              - CHF/kW/M: Swiss francs per kilowatt per month (used for grid power fees)
+              - CHF/kW/Y: Swiss francs per kilowatt per year (used for grid power fees)
+              - CHF/kVarh: Swiss francs per kilovar-hour (used for reactive energy billing)
+              - CHF/M: Swiss francs per month (e.g. fixed base fees)
+              - CHF: Swiss francs per month (one-time charges for the whole time between tariff startDate and endDate)
+
+            Note: Units should be consistent across tariffs and follow Swiss market standards.
+
+    MunicipalityTaxPrice:
+      type: object
+      required: [municipalityNumber, municipalityName]
+      properties:
+        municipalityNumber:
+          type: integer
+          description: |
+            Number for the municipality according federal statistical office. See https://www.agvchapp.bfs.admin.ch
+          minimum: 1
+          maximum: 99999
+        municipalityName:
+          type: string
+          description: |
+            Name of the municipality to which the tariff applies. This should match the official name used by the federal statistical office. See https://www.agvchapp.bfs.admin.ch
+        municipalityBase:
+          allOf:
+            - $ref: '#/components/schemas/SimplePrice'
+          description: |
+            Base price for the municipality-specific charges. Price Unit: CHF/M
+        municipalityEnergy:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeBasedPrice'
+          description: |
+            Energy price as a time-based price with unit CHF/kWh. Constant energy prices are defined as a single entry with empty months, weekdays, from "00:00" and to "00:00".
+        municipalityComment:
+          type: string
+          description: |
+            Optional comment providing additional information about the municipality-specific charges:
+              - Can include clarifications or local conditions relevant to the municipal tariff.
+              - May describe exceptions, agreements, or administrative notes.
+              - Intended for human interpretation only — not for automated processing.
+              - This field may be empty if no further detail is required.
+
+    CantonalTaxPrice:
+      type: object
+      required: [cantonName]
+      properties:
+        cantonName:
+          type: string
+          enum: ["AG", "AI", "AR", "BE", "BL", "BS", "FR", "GE", "GL", "GR", "JU", "LU", "NE", "NW", "OW", "SG", "SH", "SO", "SZ", "TG", "TI", "UR", "VD", "VS", "ZG", "ZH"]
+          description: |
+            Official abbreviation of the canton to which the tariff applies.
+        cantonBase:
+          description: |
+            Base price for the cantonal-specific charges. Price Unit: CHF/M
+          allOf:
+            - $ref: '#/components/schemas/SimplePrice'
+        cantonEnergy:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeBasedPrice'
+          description: |
+            Energy price as a time-based price with unit CHF/kWh. Constant energy prices are defined as a single entry with empty months, weekdays, from "00:00" and to "00:00".
+        cantonComment:
+          type: string
+          description: |
+            Optional comment providing additional information about the canton-specific charges:
+            Can include clarifications or special regulations relevant to the cantonal tariff.
+              - May describe exceptions, subsidies, or administrative notes.
+              - Intended for human interpretation only — not for automated processing.
+              - This field may be empty if no further detail is required.

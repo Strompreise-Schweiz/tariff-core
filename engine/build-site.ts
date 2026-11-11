@@ -6,7 +6,7 @@ import { compareText } from "./core/json.ts";
 import { zurichDate } from "./core/time.ts";
 import { annotate, NO_UTILITY, parseCli } from "./lib/cli.ts";
 import { filesBelow, isDirectory, readJsonIfExists, writeJson } from "./lib/files.ts";
-import { inHub, loadConfig, now, ORG, repositoryUrl, SITE_BASE, siteUrl, utilityRoots } from "./lib/repo.ts";
+import { ENGINE_ROOT, inHub, loadConfig, now, ORG, repositoryUrl, SITE_BASE, siteUrl, utilityRoots } from "./lib/repo.ts";
 
 const USAGE = `
 Builds the folder that GitHub Pages serves. Run from the root of an org repo or the hub repo.
@@ -16,6 +16,7 @@ Usage:  node ../tariff-core/engine/build-site.ts [--out _site]
     org repo:  data/                    -> <out>/            served as /<slug>/
     hub repo:  utilities/<slug>/data/   -> <out>/<slug>/     served as /<slug>/
                every utility            -> <out>/index.json  served as /index.json
+               status page              -> <out>/status.html served as /status.html
 
 The hub repo is the organization site, an org repo a project site below it, so a utility has the
 same URL in both places. A Pages site is limited to 1 GB, so the dynamic archive is served for the
@@ -97,6 +98,8 @@ export function buildSite(cwd: string, out: string): number {
       return 1;
     }
     writeJson(path.join(out, "index.json"), index);
+    // The status page reads every utility's status.json from this domain.
+    copyFileSync(path.join(ENGINE_ROOT, "site", "status.html"), path.join(out, "status.html"));
   }
   if (total > WARN_BYTES) annotate("warning", `site is ${Math.round(total / MB)} MB, GitHub Pages allows 1 GB`);
   console.log(`site built in ${out}: ${(total / MB).toFixed(1)} MB`);

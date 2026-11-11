@@ -33,3 +33,5 @@
    `dynamic`, then start the workflow once by hand under Actions. A utility in the hub that gets a
    dynamic tariff moves to an own repo first: remove its hub folder, create the repo with the same name
    and add it to `repositories.json`. Its URLs on the own domain stay the same.
+8. Show the VSE conformance badges: in the hub, add a row to the table in its README; in an own repo,
+   add the badges from the template README. Publishing writes `data/vse-conformance.json` and the badge files.

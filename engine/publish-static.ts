@@ -13,7 +13,9 @@ import { annotate, NO_UTILITY, parseCli, report } from "./lib/cli.ts";
 import { exists, parseJson, readJson, readJsonIfExists, writeFile, writeJson } from "./lib/files.ts";
 import { http } from "./lib/http.ts";
 import { loadConfig, now, SCHEMA_BASE, utilityRoots } from "./lib/repo.ts";
+import { writeConformance } from "./lib/conformance.ts";
 import { writeIndex } from "./lib/site-index.ts";
+import { writeStatus, yearStatus, type YearStatus } from "./lib/status.ts";
 
 const USAGE = `
 Static tariffs: fetch, repair, apply curation, validate, publish.
@@ -100,6 +102,7 @@ export async function publish(root: string, offline = false): Promise<number> {
   const collected = await collect(root, org, offline, currentYear);
   let failures = collected.failures;
   const tariffsDir = path.join(root, "data", "tariffs");
+  const years: YearStatus[] = [];
 
   for (const year of [...collected.byYear.keys()].sort((a, b) => a - b)) {
     const curation = readJsonIfExists<Curation>(path.join(root, "curation", `${year}.json`)) ?? {};
@@ -125,6 +128,7 @@ export async function publish(root: string, offline = false): Promise<number> {
     document._meta.issues = issues.filter((issue) => issue.severity !== "error");
     const errors = report(issues, `${org.slug} ${year}`);
     const reportPath = path.join(tariffsDir, `${year}.report.json`);
+    years.push(yearStatus(year, issues, errors === 0 || exists(path.join(tariffsDir, `${year}.json`))));
     if (errors) {
       failures += errors;
       writeJson(reportPath, { year, published: false, issues });
@@ -144,6 +148,7 @@ export async function publish(root: string, offline = false): Promise<number> {
   const current = path.join(tariffsDir, `${currentYear}.json`);
   const alias = path.join(tariffsDir, "current.json");
   if (exists(current) && !deepEqual(readJsonIfExists(alias), readJson(current))) writeFile(alias, readFileSync(current));
+  writeStatus(root, org, years, writeConformance(root, org));
   writeIndex(root, org);
   return failures ? 1 : 0;
 }

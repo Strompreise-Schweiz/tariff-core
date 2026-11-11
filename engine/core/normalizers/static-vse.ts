@@ -28,7 +28,8 @@ const UNIT_BY_FIELD: Record<string, string> = {
   refundStorage: "CHF/kWh", municipalityBase: "CHF/M", cantonBase: "CHF/M",
   municipalityEnergy: "CHF/kWh", cantonEnergy: "CHF/kWh",
 };
-const WEEKDAYS = new Map([["mo", "Mo"], ["tu", "Tu"], ["we", "We"], ["th", "Th"], ["fr", "Fr"], ["sa", "Sa"], ["so", "So"], ["su", "So"]]);
+// VSE 1.0.0 wrote Sunday as So, 1.0.1 as Su. Both are read, Su is written.
+const WEEKDAYS = new Map([["mo", "Mo"], ["tu", "Tu"], ["we", "We"], ["th", "Th"], ["fr", "Fr"], ["sa", "Sa"], ["so", "Su"], ["su", "Su"]]);
 const END_OF_DAY = new Set(["23:59", "24:00", "23:59:59"]);
 
 class RepairLog {
