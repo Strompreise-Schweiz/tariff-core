@@ -32,13 +32,15 @@ jobs:
           ref: ${{ inputs.engine-ref }}
           path: _engine
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v6
         with:
-          python-version: "3.12"
+          node-version-file: _engine/.nvmrc
+          cache: npm
+          cache-dependency-path: _engine/package-lock.json
 
       - name: Install dependencies
-        run: pip install -r _engine/requirements.txt
+        run: npm ci --prefix _engine --omit=dev
 
       - name: Publish static tariffs
         id: publish
@@ -46,7 +48,7 @@ jobs:
         env:
           OFFLINE_FLAG: ${{ inputs.offline && '--offline' || '' }}
         # OFFLINE_FLAG is empty or a single fixed word, so it stays unquoted on purpose.
-        run: python3 _engine/engine/publish_static.py $OFFLINE_FLAG
+        run: node _engine/engine/publish-static.ts $OFFLINE_FLAG
 
       - name: Commit and push if changed
         run: |

@@ -13,7 +13,7 @@ in January 2026 that the assignment follows from the tariff type, and that the b
 energy and not to the grid. This does not decide which of several grid tariffs goes with which energy
 tariff. `tariffName` is not unique either: EKZ repeats names across voltage levels.
 
-So `suggest_products.py` proposes combinations and a person verifies them against the price sheet.
+So `suggest-products.ts` proposes combinations and a person verifies them against the price sheet.
 `status` shows which is which. A wrong automatic assignment would cause wrong invoices, so it must
 not look verified.
 
@@ -52,7 +52,7 @@ So a utility lives in exactly one place:
   an own repo. One workflow run covers all of them, and corrections arrive as pull requests.
 
 The engine accepts both: run from a repo root it processes either the one utility or every folder
-under `utilities/`. `validate.py` rejects enabled dynamic tariffs in the hub and a folder name that
+under `utilities/`. `validate.ts` rejects enabled dynamic tariffs in the hub and a folder name that
 differs from `slug`. A utility is never split between both places.
 
 ## Own domain through GitHub Pages
@@ -60,7 +60,7 @@ differs from `slug`. A utility is never split between both places.
 URLs on `raw.githubusercontent.com` contain the repo name, so moving a utility between the hub and an
 own repo would break every consumer. The hub repo is therefore the organization site of GitHub Pages
 and carries the own domain `data.strompreise-schweiz.ch`. Org repos are project sites, which GitHub
-serves under the same domain at `/<repo>/`. `build_site.py` gives both the same layout:
+serves under the same domain at `/<repo>/`. `build-site.ts` gives both the same layout:
 
 ```text
 https://data.strompreise-schweiz.ch/index.json            every utility
@@ -77,10 +77,23 @@ Utility repos and hub folders use the name of the company, shortened where the s
 established name (`ekz`, `bkw`, `groupe-e`, `elektrizitaetswerk-wangen`). Infrastructure repos start with
 `tariff-` or `utility-`. These names are part of the public URLs, so they do not change once consumers use them.
 
-## Python instead of Node for validation
+## TypeScript on Node.js for the whole engine
 
-The fetch pipeline was already in Python. One language keeps the semantic checks (time coverage,
-product references) next to the schema checks.
+Until November 2026 the engine was Python. It moved to TypeScript so that the same validation runs in
+the workflows, locally and in the browser, for example on a website that checks a file before upload.
+A website in JavaScript would otherwise need a second implementation of the semantic checks (time
+coverage, product references), and two implementations drift apart. The rest of the engine moved too,
+so the project has one language and one toolchain.
+
+- Node.js 26 runs the `.ts` files directly, without a build step. The version is pinned in `.nvmrc`,
+  the major version Vercel uses by default.
+- `engine/core/` uses no Node APIs. Swiss time comes from `Intl`, which every browser has, and the
+  short hash in tariff ids is FNV-1a, because Web Crypto has no synchronous hash.
+- Dependencies stay few: `ajv` and `ajv-formats` for JSON Schema. The dynamic pipeline and the site
+  build need no packages.
+- Nothing was in production yet, so the move did not keep Python's quirks. Run on copies of all
+  repos, the new engine produced the same tariff data, products and issue codes. Ids of tariffs that
+  share a name got a new hash suffix, and messages are worded differently.
 
 ## Swiss local time with offset for publishing
 

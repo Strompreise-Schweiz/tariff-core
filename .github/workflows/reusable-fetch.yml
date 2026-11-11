@@ -27,15 +27,15 @@ jobs:
           ref: ${{ inputs.engine-ref }}
           path: _engine
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v6
         with:
-          python-version: "3.12"
+          node-version-file: _engine/.nvmrc
 
       - name: Fetch and normalize tariffs
         id: fetch
         continue-on-error: true
-        run: python3 _engine/engine/fetch_and_normalize.py
+        run: node _engine/engine/fetch-and-normalize.ts
 
       - name: Commit and push if changed
         run: |

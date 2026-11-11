@@ -14,21 +14,21 @@
 4. Run locally, from the root of the utility's repo or of the hub repo:
 
    ```bash
-   python3 ../tariff-core/engine/publish_static.py
-   python3 ../tariff-core/engine/validate.py
+   node ../tariff-core/engine/publish-static.ts
+   node ../tariff-core/engine/validate.ts
    ```
 
 5. Resolve the errors in `data/tariffs/<year>.report.json`:
-   - Format deviation that recurs: add a repair to `engine/normalizers/static_vse.py` with a test.
+   - Format deviation that recurs: add a repair to `engine/core/normalizers/static-vse.ts` with a test.
    - Wrong data at one utility: add an override with a reason to `curation/<year>.json`. Consider telling the utility.
    - The tariff really is that way: add it to `acceptIssues` with a reason.
 6. Propose products, check them against the price sheet, and add them to `curation/<year>.json`:
 
    ```bash
-   python3 ../tariff-core/engine/suggest_products.py 2026
+   node ../tariff-core/engine/suggest-products.ts 2026
    ```
 
-   In the hub, run `suggest_products.py` from `utilities/<slug>/`.
+   In the hub, run `suggest-products.ts` from `utilities/<slug>/`.
 7. For dynamic tariffs, the URL is in `prices.dynamic.url` of the yearly file. Add an entry per tariff in
    `dynamic`, then start the workflow once by hand under Actions. A utility in the hub that gets a
    dynamic tariff moves to an own repo first: remove its hub folder, create the repo with the same name

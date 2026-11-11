@@ -20,10 +20,10 @@ All of it is served under one domain, see [`docs/stable-urls.md`](docs/stable-ur
 
 | Pipeline | Runs | Script | Result |
 |---|---|---|---|
-| Dynamic | Daily, in the evening | `engine/fetch_and_normalize.py` | `data/dynamic/<id>/latest.json` and archive |
-| Static | Weekly, and on changes to `curation/` | `engine/publish_static.py` | `data/tariffs/<year>.json`, `current.json` |
-| Validation | On push | `engine/validate.py` | Fails on errors |
-| Site | After each data change | `engine/build_site.py` | GitHub Pages under `data.strompreise-schweiz.ch` |
+| Dynamic | Daily, in the evening | `engine/fetch-and-normalize.ts` | `data/dynamic/<id>/latest.json` and archive |
+| Static | Weekly, and on changes to `curation/` | `engine/publish-static.ts` | `data/tariffs/<year>.json`, `current.json` |
+| Validation | On push | `engine/validate.ts` | Fails on errors |
+| Site | After each data change | `engine/build-site.ts` | GitHub Pages under `data.strompreise-schweiz.ch` |
 
 ## Documentation
 
@@ -36,20 +36,40 @@ All of it is served under one domain, see [`docs/stable-urls.md`](docs/stable-ur
 
 ## Running it locally
 
-From the root of an org repo or of the hub repo, with `tariff-core` next to it. In the hub, every
+The engine is TypeScript and runs directly on Node.js 26, without a build step. The version is pinned
+in [`.nvmrc`](.nvmrc), the same major version Vercel uses by default. Once, in this repo:
+
+```bash
+nvm install && nvm use    # Node.js from .nvmrc
+npm install
+```
+
+On Ubuntu and WSL, Node.js 26 needs `libatomic1`: `sudo apt install libatomic1`.
+
+Then from the root of an org repo or of the hub repo, with `tariff-core` next to it. In the hub, every
 utility under `utilities/` is processed:
 
 ```bash
-python3 -m venv ../.venv && source ../.venv/bin/activate   # once per shell
-pip install -r ../tariff-core/requirements.txt
-python3 ../tariff-core/engine/fetch_and_normalize.py     # dynamic (stdlib only)
-python3 ../tariff-core/engine/publish_static.py          # static
-python3 ../tariff-core/engine/validate.py                # checks
-python3 ../tariff-core/engine/suggest_products.py 2026   # product proposals (in the hub: from utilities/<slug>/)
-python3 ../tariff-core/engine/build_site.py              # site preview in _site/
+node ../tariff-core/engine/fetch-and-normalize.ts     # dynamic (no dependencies)
+node ../tariff-core/engine/publish-static.ts          # static
+node ../tariff-core/engine/validate.ts                # checks
+node ../tariff-core/engine/suggest-products.ts 2026   # product proposals (in the hub: from utilities/<slug>/)
+node ../tariff-core/engine/build-site.ts              # site preview in _site/ (no dependencies)
 ```
 
-Tests, from this repo: `pip install -r requirements.txt pytest && python -m pytest tests`
+Each script prints its options with `--help`. Tests, from this repo: `npm test` and `npm run typecheck`.
+
+## Code layout
+
+```text
+engine/
+  core/        runs in Node and in the browser: types, repairs, curation, products, validation
+  lib/         Node only: files, repo layout and URLs, HTTP, command line
+  *.ts         the scripts the workflows run
+```
+
+A website imports [`engine/core/index.ts`](engine/core/index.ts) to check a file with the same rules
+and issue codes as the workflows.
 
 ## License
 

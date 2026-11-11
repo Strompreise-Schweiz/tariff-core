@@ -23,8 +23,10 @@ jobs:
           repository: Strompreise-Schweiz/tariff-core
           ref: ${{ inputs.engine-ref }}
           path: _engine
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v6
         with:
-          python-version: "3.12"
-      - run: pip install -r _engine/requirements.txt
-      - run: python3 _engine/engine/validate.py
+          node-version-file: _engine/.nvmrc
+          cache: npm
+          cache-dependency-path: _engine/package-lock.json
+      - run: npm ci --prefix _engine --omit=dev
+      - run: node _engine/engine/validate.ts

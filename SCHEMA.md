@@ -20,13 +20,13 @@ data/dynamic/<id>/normalized/<year>/<date>.json   own format, UTC
 `<date>` is always the Swiss calendar day the prices apply to.
 
 The hub repo also has `repositories.json`, the list of utilities with an own repo, from which
-`build_site.py` writes the overall `index.json` of the site. GitHub Pages serves each utility's `data/`
+`build-site.ts` writes the overall `index.json` of the site. GitHub Pages serves each utility's `data/`
 folder under `https://data.strompreise-schweiz.ch/<slug>/`, with the dynamic archive of the current year only.
 `data/index.json` names the utility's `repository` and `site`.
 
 ## Three tariff forms
 
-| `tariffForm` | Where the prices are | Rules checked by `validate.py` |
+| `tariffForm` | Where the prices are | Rules checked by `validate.ts` |
 |---|---|---|
 | `constant` | `prices.energy` with one entry, `from` = `to` = `00:00` | One price, no time restriction |
 | `multilevel` | `prices.energy` with several entries | Every minute of every month and weekday has exactly one price |
@@ -118,7 +118,7 @@ Rules for consumers:
 - `_meta.additions` lists what was added to the source data.
 
 `normalized/` contains the same data with UTC timestamps and deduplicated monthly charges. See the
-`normalize` function in [`engine/normalizers/generic_vse.py`](engine/normalizers/generic_vse.py).
+`normalize` function in [`engine/core/normalizers/generic-vse.ts`](engine/core/normalizers/generic-vse.ts).
 
 ## Input: `config/source.json` and `curation/<year>.json`
 
@@ -137,5 +137,5 @@ Schemas: [`schemas/source-config/`](schemas/source-config/v1.schema.json) and
 
 A rule that no longer matches anything is an error, so outdated corrections become visible.
 
-Issues that block publication are listed in `engine/validate.py`. A year with errors is not
+Issues that block publication are listed in [`engine/core/rules.ts`](engine/core/rules.ts). A year with errors is not
 published: the previous file stays online and `<year>.report.json` shows the reasons.

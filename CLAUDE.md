@@ -34,23 +34,31 @@ The workspace folder holds all repos side by side:
 - Static prices exclude VAT. Price windows are Swiss wall-clock time.
 - Dynamic timestamps are Swiss local time with an offset. A day has 23, 24 or 25 hours, so do not
   hardcode 96 intervals.
-- Sources deviate from the standard. Add repairs to `engine/normalizers/static_vse.py`, log each one,
+- Sources deviate from the standard. Add repairs to `engine/core/normalizers/static-vse.ts`, log each one,
   and add a test with the deviation as a fixture.
 
 ## Commands
 
 ```bash
-python -m pytest tests                                  # in tariff-core
-python3 ../tariff-core/engine/publish_static.py          # in an org repo
-python3 ../tariff-core/engine/fetch_and_normalize.py     # in an org repo
-python3 ../tariff-core/engine/validate.py                # in an org repo
-python3 ../tariff-core/engine/build_site.py              # in an org repo, site in _site/
+npm test && npm run typecheck                         # in tariff-core
+node ../tariff-core/engine/publish-static.ts          # in an org repo
+node ../tariff-core/engine/fetch-and-normalize.ts     # in an org repo
+node ../tariff-core/engine/validate.ts                # in an org repo
+node ../tariff-core/engine/build-site.ts              # in an org repo, site in _site/
 ```
 
 The scripts also run in the hub repo root and then process every folder under `utilities/`.
 
-The engine for dynamic tariffs uses the Python standard library only. `validate.py` and
-`publish_static.py` also need `jsonschema`.
+The engine is TypeScript, run directly by Node.js 26 (`.nvmrc`) without a build step. Use only
+erasable TypeScript syntax (no `enum`, no parameter properties) and import with the `.ts` extension.
+File names are kebab-case.
+
+- `engine/core/` must not use Node APIs, so a website can import it. Swiss time comes from `Intl`.
+- `engine/lib/` holds the Node helpers, the scripts are directly in `engine/`.
+- The dynamic pipeline and `build-site.ts` use Node built-ins only. `validate.ts` and
+  `publish-static.ts` also need `ajv` (`npm install` in tariff-core).
+- Types of the published files are in `engine/core/types.ts` and follow the schemas.
+- Archived day files from before 2.0 have no `_meta`. They are real history and stay as they are.
 
 ## Reference documents
 

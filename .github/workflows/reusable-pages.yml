@@ -1,6 +1,6 @@
 name: Reusable deploy GitHub Pages
 
-# Builds the site with engine/build_site.py and deploys it. The calling repo needs
+# Builds the site with engine/build-site.ts and deploys it. The calling repo needs
 # Settings > Pages > Source: "GitHub Actions". The hub repo is the organization site
 # and carries the own domain; org repos are project sites below it.
 
@@ -36,13 +36,13 @@ jobs:
           ref: ${{ inputs.engine-ref }}
           path: _engine
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v6
         with:
-          python-version: "3.12"
+          node-version-file: _engine/.nvmrc
 
       - name: Build site
-        run: python3 _engine/engine/build_site.py --out _site
+        run: node _engine/engine/build-site.ts --out _site
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
