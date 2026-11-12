@@ -45,14 +45,14 @@ It publishes no number for this, and responses have no rate-limit headers. A 429
 |---|---|---|
 | `raw.githubusercontent.com` | Unpublished, per address | Free. Not meant as an API. |
 | GitHub Pages | 100 GB per month (soft), 1 GB per site, can return 429 | Own domain possible. Not meant as hosting for a commercial service. |
-| Cloudflare in front of GitHub | Per Cloudflare plan | Cached, so GitHub sees few requests |
+| A CDN in front of GitHub | Per CDN plan | Cached, so GitHub sees few requests |
 
 With up to about 90 KB per `latest.json` (a tariff with several components), 100 GB is roughly one million fetches a month.
 
 ## Own domain: the only URL that stays yours
 
 A URL on `raw.githubusercontent.com` ties all consumers to GitHub and to the repo name. With the own
-domain the backend can change, for example to Cloudflare in front of GitHub, without changing a URL.
+domain the backend can change, for example to a CDN in front of GitHub, without changing a URL.
 Point consumers to it, never to `raw.githubusercontent.com`.
 
 How it is set up (DNS at Vercel, where `strompreise-schweiz.ch` is hosted):

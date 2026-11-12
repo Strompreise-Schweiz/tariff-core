@@ -26,38 +26,10 @@ Set `alert_after_hour` per tariff if a utility publishes later.
 
 ## For a reliable time: external trigger
 
-A scheduler outside GitHub can start the workflow through the API. The start is then close to the
-requested time, although the job can still wait for a runner. The cron entries stay as a fallback.
-
-Example with a Cloudflare Worker with a cron trigger. It needs a fine-grained token with
-`Actions: write` on the org repos, stored as a secret:
-
-```js
-const REPOS = ["ekz", "bkw"];
-
-export default {
-  async scheduled(event, env) {
-    for (const repo of REPOS) {
-      const response = await fetch(
-        `https://api.github.com/repos/Strompreise-Schweiz/${repo}/actions/workflows/fetch-dynamic.yml/dispatches`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-            Accept: "application/vnd.github+json",
-            "User-Agent": "strompreise-schweiz-scheduler",
-          },
-          body: JSON.stringify({ ref: "main" }),
-        },
-      );
-      if (!response.ok) console.error(repo, response.status);
-    }
-  },
-};
-```
-
-Cloudflare cron triggers run in UTC. 18:35 Swiss time is `35 17` in winter and `35 16` in summer. Set
-both; the second run changes nothing.
+A scheduler outside GitHub can start `fetch-dynamic.yml` through the `workflow_dispatch` API. The start
+is then close to the requested time, although the job can still wait for a runner. The scheduler needs
+a fine-grained token with `Actions: write` on the org repos. The cron entries stay as a fallback, and
+runs are idempotent, so an extra run changes nothing.
 
 ## Other behaviour
 
