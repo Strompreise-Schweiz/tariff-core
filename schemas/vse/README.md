@@ -3,13 +3,15 @@
 The binding format for the machine-readable tariff files of Swiss utilities, published by the VSE
 (Verband Schweizerischer Elektrizitätsunternehmen) at
 [strom.ch/api-tariff-definition](https://www.strom.ch/api-tariff-definition). The content is kept
-unchanged. The VSE file names do not contain the version, and the newer one carries a download suffix
-(`_0`), so the files here keep the VSE name and add the version from `info.version`.
+unchanged. The VSE offers the files as `.txt` downloads, although the content is an OpenAPI 3.0.3
+document in YAML. The VSE file names do not contain the version, and the newer one carries a download
+suffix (`_0`), so the files here keep the VSE name, add the version from `info.version` and use the
+extension `.yaml`.
 
 | File | Version | Original file name |
 |---|---|---|
-| [`ch-electricity-tariffs-openapi-1.0.0.yaml`](ch-electricity-tariffs-openapi-1.0.0.yaml) | 1.0.0 | `ch-electricity-tariffs-openapi` |
-| [`ch-electricity-tariffs-openapi-1.0.1.yaml`](ch-electricity-tariffs-openapi-1.0.1.yaml) | 1.0.1 | `2026-ch-electricity-tariffs-openapi_0` |
+| [`ch-electricity-tariffs-openapi-1.0.0.yaml`](ch-electricity-tariffs-openapi-1.0.0.yaml) | 1.0.0 | `ch-electricity-tariffs-openapi.txt` |
+| [`ch-electricity-tariffs-openapi-1.0.1.yaml`](ch-electricity-tariffs-openapi-1.0.1.yaml) | 1.0.1 | `2026-ch-electricity-tariffs-openapi_0.txt` |
 
 ## Changes from 1.0.0 to 1.0.1
 
