@@ -33,6 +33,11 @@
       "type": "string",
       "pattern": "^CH\\d{11}$"
     },
+    "elcom_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of the grid operator at ElCom, as in https://energy.ld.admin.ch/elcom/electricityprice/operator/<elcom_id>. One operator can have several VSE identifiers."
+    },
     "data_license": {
       "type": "string"
     },

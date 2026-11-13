@@ -37,6 +37,11 @@
       "description": "VSE-ID starts with CH, followed by 11 digits",
       "pattern": "^CH[0-9]{11}$"
     },
+    "elcom_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of the grid operator at ElCom"
+    },
     "location": {
       "type": "object",
       "required": [

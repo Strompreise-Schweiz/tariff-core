@@ -28,6 +28,7 @@ export function writeIndex(root: string, org: SourceConfig): void {
     organization: org.name,
     slug,
     vse_id: org.vse_id,
+    elcom_id: org.elcom_id ?? null,
     website: org.website ?? null,
     license: org.data_license ?? null,
     repository: repositoryUrl(root, slug),

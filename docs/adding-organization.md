@@ -10,7 +10,9 @@
      source "GitHub Actions", and add it to `repositories.json` in the hub repo.
 
    The folder or repo name becomes `slug` and part of the public URL, so choose carefully.
-3. Fill in `config/source.json`. The VSE identifier is on the VSE website.
+3. Fill in `config/source.json`. The VSE identifier is on the VSE website. The ElCom number (`elcom_id`)
+   is the last part of the operator URL on LINDAS, `https://energy.ld.admin.ch/elcom/electricityprice/operator/<elcom_id>`.
+   For a utility with an own repo, add both also to its entry in `repositories.json`.
 4. Run locally, from the root of the utility's repo or of the hub repo:
 
    ```bash

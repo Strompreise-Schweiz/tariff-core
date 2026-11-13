@@ -166,6 +166,7 @@ export interface SourceConfig {
   country?: string;
   website?: string;
   vse_id: string;
+  elcom_id?: number;
   data_license?: string;
   dynamic: DynamicTariffConfig[];
   static: { sources: StaticSource[] };

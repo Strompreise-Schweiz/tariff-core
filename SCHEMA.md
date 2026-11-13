@@ -20,9 +20,13 @@ data/dynamic/<id>/normalized/<year>/<date>.json   own format, UTC
 `<date>` is always the Swiss calendar day the prices apply to.
 
 The hub repo also has `repositories.json`, the list of utilities with an own repo, from which
-`build-site.ts` writes the overall `index.json` of the site. GitHub Pages serves each utility's `data/`
-folder under `https://data.strompreise-schweiz.ch/<slug>/`, with the dynamic archive of the current year only.
-`data/index.json` names the utility's `repository` and `site`.
+`build-site.ts` writes the overall `index.json` of the site
+(schema: [`schemas/overall-index/v1.schema.json`](schemas/overall-index/v1.schema.json)). GitHub Pages
+serves each utility's `data/` folder under `https://data.strompreise-schweiz.ch/<slug>/`, with the
+dynamic archive of the current year only. `data/index.json` names the utility's `repository` and `site`.
+
+Both indexes identify a utility by `vse_id` and `elcom_id`, `null` if not known. In the overall index,
+`maintained_in` is `hub` or `own_repository`.
 
 ## Three tariff forms
 

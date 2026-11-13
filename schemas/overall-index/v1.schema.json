@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/overall-index/v1.schema.json",
+  "title": "Overall index of the site (/index.json)",
+  "type": "object",
+  "required": [
+    "site",
+    "utilities"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$comment": {
+      "type": "string"
+    },
+    "site": {
+      "type": "string",
+      "format": "uri"
+    },
+    "utilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "vse_id",
+          "elcom_id",
+          "maintained_in",
+          "repository",
+          "index"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vse_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^CH\\d{11}$"
+          },
+          "elcom_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Number of the grid operator at ElCom. null if not known yet."
+          },
+          "maintained_in": {
+            "enum": [
+              "hub",
+              "own_repository"
+            ],
+            "description": "hub: a folder under utilities/ in the hub repo. own_repository: a repo of its own."
+          },
+          "repository": {
+            "type": "string",
+            "format": "uri"
+          },
+          "index": {
+            "type": "string",
+            "format": "uri",
+            "description": "The utility's index.json with all its URLs."
+          }
+        }
+      }
+    }
+  }
+}

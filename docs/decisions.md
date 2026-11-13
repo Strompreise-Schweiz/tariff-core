@@ -143,3 +143,10 @@ Errors of the document as a whole still block it, because they make every tariff
 operator number, ids that are not unique, a correction that no longer matches, or a curated product
 that needs a left-out tariff. A year in which every tariff has an error is blocked too, so no empty
 file replaces a good one. The status page shows how many tariffs were left out.
+
+## ElCom number next to the VSE identifier
+
+The VSE identifier names who publishes a tariff file. The ElCom number names the grid operator, and the
+official tariff data of ElCom on LINDAS uses it as key. One operator can have several VSE identifiers.
+Config and indexes therefore carry `elcom_id` in addition to `vse_id`.
+It is optional in `config/source.json` and `null` in the indexes if not known.

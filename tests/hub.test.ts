@@ -5,17 +5,21 @@ import { test } from "node:test";
 
 import { buildSite } from "../engine/build-site.ts";
 import { hubIssues } from "../engine/core/rules.ts";
+import { schemaIssues } from "../engine/core/schemas.ts";
 import type { SourceConfig } from "../engine/core/types.ts";
 import { rawUrl, siteUrl, utilityRoots } from "../engine/lib/repo.ts";
 import { main as publishMain, publish } from "../engine/publish-static.ts";
 import { main as validateMain } from "../engine/validate.ts";
 import { ekzLike, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
 
-function addUtility(hub: string, slug: string, { folder, dynamic }: { folder?: string; dynamic?: Obj[] } = {}): string {
+function addUtility(
+  hub: string, slug: string, { folder, dynamic, elcomId }: { folder?: string; dynamic?: Obj[]; elcomId?: number } = {},
+): string {
   const root = path.join(hub, "utilities", folder ?? slug);
   writeJsonFile(path.join(root, "curation/source.json"), ekzLike());
   writeJsonFile(path.join(root, "config/source.json"), {
     slug, name: slug[0].toUpperCase() + slug.slice(1), vse_id: "CH10000000001", dynamic: dynamic ?? [],
+    ...(elcomId ? { elcom_id: elcomId } : {}),
     static: { sources: [{ name: "main", file: "curation/source.json" }] },
   });
   return root;
@@ -99,14 +103,21 @@ test("the hub validates cleanly", async () => {
 
 test("the site of the hub has one folder per utility and an overall index", async () => {
   const hub = makeHub();
-  for (const root of [addUtility(hub, "alpha"), addUtility(hub, "beta")]) await publish(root);
-  writeJsonFile(path.join(hub, "repositories.json"), { repositories: [{ slug: "ekz", name: "EKZ" }] });
+  for (const root of [addUtility(hub, "alpha", { elcomId: 101 }), addUtility(hub, "beta")]) await publish(root);
+  writeJsonFile(path.join(hub, "repositories.json"), {
+    repositories: [{ slug: "ekz", name: "EKZ", vse_id: "CH10153012345", elcom_id: 486 }],
+  });
   assert.equal(buildSite(hub, path.join(hub, "_site")), 0);
   assert.ok(existsSync(path.join(hub, "_site/alpha/tariffs/current.json")));
   assert.ok(existsSync(path.join(hub, "_site/beta/index.json")));
   const index = readJsonFile(path.join(hub, "_site/index.json"));
-  assert.deepEqual(index.utilities.map((u: Obj) => [u.slug, u.maintained_in]), [["alpha", "hub"], ["beta", "hub"], ["ekz", "own repository"]]);
+  assert.deepEqual(schemaIssues(index, "overall-index"), []);
+  assert.deepEqual(
+    index.utilities.map((u: Obj) => [u.slug, u.maintained_in, u.elcom_id]),
+    [["alpha", "hub", 101], ["beta", "hub", null], ["ekz", "own_repository", 486]],
+  );
   assert.equal(index.utilities[2].index, "https://data.strompreise-schweiz.ch/ekz/index.json");
+  assert.equal(readJsonFile(path.join(hub, "_site/alpha/index.json")).elcom_id, 101);
 });
 
 test("a utility in the hub and in an own repo is an error", () => {

@@ -54,17 +54,21 @@ interface ListedRepository {
   slug: string;
   name: string;
   vse_id?: string;
+  elcom_id?: number;
 }
 
-/** All utilities, in the hub and in own repos from repositories.json. */
+/** All utilities, in the hub and in own repos from repositories.json. Schema: schemas/overall-index/. */
 function overallIndex(cwd: string, roots: string[]) {
   const hubEntries = roots.map((root) => {
-    const { slug, name, vse_id } = loadConfig(root);
-    return { slug, name, vse_id, maintained_in: "hub", repository: repositoryUrl(root, slug), index: siteUrl(slug, "data/index.json") };
+    const { slug, name, vse_id, elcom_id } = loadConfig(root);
+    return {
+      slug, name, vse_id, elcom_id: elcom_id ?? null, maintained_in: "hub",
+      repository: repositoryUrl(root, slug), index: siteUrl(slug, "data/index.json"),
+    };
   });
   const listed = readJsonIfExists<{ repositories: ListedRepository[] }>(path.join(cwd, "repositories.json"))?.repositories ?? [];
-  const ownEntries = listed.map(({ slug, name, vse_id }) => ({
-    slug, name, vse_id: vse_id ?? null, maintained_in: "own repository",
+  const ownEntries = listed.map(({ slug, name, vse_id, elcom_id }) => ({
+    slug, name, vse_id: vse_id ?? null, elcom_id: elcom_id ?? null, maintained_in: "own_repository",
     repository: `https://github.com/${ORG}/${slug}`, index: siteUrl(slug, "data/index.json"),
   }));
   return {
