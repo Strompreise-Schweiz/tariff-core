@@ -74,6 +74,14 @@ export function zurichHour(ms: number): number {
   return Number(formatTimestamp(inZurich(ms)).slice(11, 13));
 }
 
+/** Swiss wall-clock time of an instant: the date, month 0 to 11, weekday 0 (Monday) to 6, minute of the day. */
+export function zurichWall(ms: number): { date: string; month: number; weekday: number; minute: number } {
+  const text = formatTimestamp(inZurich(ms));
+  const [year, month, day] = text.slice(0, 10).split("-").map(Number);
+  const weekday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+  return { date: text.slice(0, 10), month: month - 1, weekday, minute: Number(text.slice(11, 13)) * 60 + Number(text.slice(14, 16)) };
+}
+
 /** YYYY-MM-DD plus a number of days. */
 export function addDays(day: string, days: number): string {
   const [year, month, date] = day.split("-").map(Number);

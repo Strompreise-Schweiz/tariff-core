@@ -4,11 +4,11 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { applyCuration, assignIds } from "../engine/core/curation.ts";
-import { repairStatic } from "../engine/core/normalizers/static-vse.ts";
+import { repairTariffFile } from "../engine/core/tariff-file.ts";
 import { suggestProducts as suggest } from "../engine/core/products.ts";
 import { coverageProblems, documentIssues } from "../engine/core/rules.ts";
 import type { Issue, TariffDocument, TimePrice } from "../engine/core/types.ts";
-import { publish } from "../engine/publish-static.ts";
+import { build as buildUtility } from "../engine/build.ts";
 import { ekzLike, price, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
 
 /** Based on the example in NNMV annex 10, including its deviations from the OpenAPI. */
@@ -34,12 +34,12 @@ function nnmvLike(): Obj {
 }
 
 function build(raw: Obj, curation: Obj = {}, year = 2026): [Obj, Issue[]] {
-  const { document: repaired, repairs, problems } = repairStatic(raw);
+  const { document: repaired, repairs, problems } = repairTariffFile(raw);
   assert.deepEqual(problems, []);
   const { tariffs, applied, issues } = applyCuration(repaired.tariffs, curation);
   const document = {
     dsoName: repaired.dsoName, dsoNumber: repaired.dsoNumber, tariffs: assignIds(tariffs), products: curation.products ?? [],
-    _meta: { schemaVersion: "1.0", year, source: [], repairs, overrides: applied },
+    _meta: { schemaVersion: "2.0", vseVersion: "1.0.1", generator: { name: "t", version: "0", url: "https://x.example" }, year, pricesExcludeVat: true, source: [], repairs, corrections: applied },
   } as TariffDocument;
   return [document, [...issues, ...documentIssues(document, year)]];
 }
@@ -88,7 +88,7 @@ test("NNMV example is repaired", () => {
 });
 
 test("the dso number from the tariffs becomes an integer", () => {
-  const { repairs } = repairStatic(nnmvLike());
+  const { repairs } = repairTariffFile(nnmvLike());
   assert.equal(repairs.find((r) => r.code === "dso_number_to_integer")?.detail, 'converted "10063012345" to an integer');
 });
 
@@ -138,7 +138,7 @@ test("curation fixes defects and records the reason", () => {
   };
   const [document, issues] = build(uznachLike(), curation);
   assert.deepEqual(errors(issues), []);
-  assert.equal(document._meta.overrides[0].reason, "Price sheet 2026");
+  assert.equal(document._meta.corrections[0].reason, "Price sheet 2026");
 });
 
 test("a stale curation rule is an error", () => {
@@ -235,48 +235,49 @@ function repo(source: Obj | string): string {
   const root = tempDir();
   writeJsonFile(path.join(root, "curation/source.json"), source);
   writeJsonFile(path.join(root, "config/source.json"), {
-    slug: "muster", name: "Muster", vse_id: "CH10000000001", dynamic: [],
-    static: { sources: [{ name: "main", file: "curation/source.json" }] },
+    slug: "muster", name: "Muster", vse_id: "CH10000000001", prices: [],
+    tariffs: [{ name: "main", file: "curation/source.json" }],
   });
   setNow("2026-11-02T10:00:00Z");
   return root;
 }
 
-test("a multi-year source is split by year", async () => {
+test("a multi-year source is split by year", () => {
   // EKZ publishes 2026 and 2027 in one file.
   const raw = ekzLike();
   const nextYear = { ...structuredClone(raw.tariffs[0]), startDate: "2027-01-01", endDate: "2027-12-31" };
   raw.tariffs.push(nextYear);
   const root = repo(raw);
-  assert.equal(await publish(root), 0);
+  assert.equal(buildUtility(root), 0);
   assert.equal(readJsonFile(path.join(root, "data/tariffs/2027.json")).tariffs.length, 1);
   assert.deepEqual(readFileSync(path.join(root, "data/tariffs/current.json")), readFileSync(path.join(root, "data/tariffs/2026.json")));
   const index = readJsonFile(path.join(root, "data/index.json"));
-  assert.deepEqual(Object.keys(index.static.years), ["2026", "2027"]);
+  assert.deepEqual(Object.keys(index.tariffs.years), ["2026", "2027"]);
 });
 
-test("a failed year keeps the previous file online", async () => {
+test("a failed year keeps the previous file online", () => {
   const root = repo(ekzLike());
-  assert.equal(await publish(root), 0);
+  assert.equal(buildUtility(root), 0);
   const good = readFileSync(path.join(root, "data/tariffs/2026.json"));
   writeJsonFile(path.join(root, "curation/source.json"), uznachLike());
-  assert.equal(await publish(root), 1);
+  assert.ok(buildUtility(root) > 0);
   assert.deepEqual(readFileSync(path.join(root, "data/tariffs/2026.json")), good);
-  assert.equal(readJsonFile(path.join(root, "data/tariffs/2026.report.json")).published, false);
+  const year = readJsonFile(path.join(root, "data/checks.json")).tariffs[0];
+  assert.deepEqual([year.published, year.online], [false, true]);
 });
 
-test("a rerun writes nothing", async () => {
+test("a rerun writes nothing", () => {
   const root = repo(ekzLike());
-  await publish(root);
+  buildUtility(root);
   const first = readFileSync(path.join(root, "data/tariffs/2026.json"));
   setNow("2026-11-03T10:00:00Z");
-  await publish(root);
+  buildUtility(root);
   assert.deepEqual(readFileSync(path.join(root, "data/tariffs/2026.json")), first);
 });
 
-test("a source with a byte order mark is read", async () => {
+test("a source with a byte order mark is read", () => {
   const root = repo(`﻿${JSON.stringify(ekzLike())}`);
-  assert.equal(await publish(root), 0);
+  assert.equal(buildUtility(root), 0);
 });
 
 /** Shape of the EKZ 2027 data: four grid clusters, no voltage level on electricity, metering and fees. */
@@ -329,21 +330,21 @@ test("a product selection is valid", () => {
   assert.deepEqual(errors(documentIssues(document as TariffDocument, 2026)), []);
 });
 
-test("a tariff with an error of its own is left out and the year is published", async () => {
+test("a tariff with an error of its own is left out and the year is published", () => {
   // Shape of BKW 2026: a municipality number "#N/A", an Excel error in the export.
   const raw = ekzLike();
   raw.tariffs[6].prices.municipalityTaxes[0].municipalityNumber = "#N/A";
   const root = repo(raw);
-  assert.equal(await publish(root), 0);
+  assert.equal(buildUtility(root), 0);
   const document = readJsonFile(path.join(root, "data/tariffs/2026.json"));
   assert.equal(document.tariffs.length, ekzLike().tariffs.length - 1);
-  assert.deepEqual(document._meta.excluded.map((t: Obj) => [t.id, t.tariffName]), [["regional-fees-abgaben-ne7", "Abgaben"]]);
-  assert.equal(document._meta.excluded[0].problems[0], 'prices/municipalityTaxes/0/municipalityNumber: must be integer, is "#N/A"');
-  const status = readJsonFile(path.join(root, "data/status.json"));
-  assert.deepEqual([status.years[0].blocked, status.years[0].excluded], [false, 1]);
+  const year = readJsonFile(path.join(root, "data/checks.json")).tariffs[0];
+  assert.deepEqual(year.excluded.map((t: Obj) => [t.id, t.tariffName]), [["regional-fees-abgaben-ne7", "Abgaben"]]);
+  assert.equal(year.excluded[0].problems[0], 'prices/municipalityTaxes/0/municipalityNumber: must be integer, is "#N/A"');
+  assert.equal(year.published, true);
 });
 
-test("a product that needs a left-out tariff blocks the year", async () => {
+test("a product that needs a left-out tariff blocks the year", () => {
   const raw = ekzLike();
   raw.tariffs[6].prices.municipalityTaxes[0].municipalityNumber = "#N/A";
   const root = repo(raw);
@@ -351,9 +352,9 @@ test("a product that needs a left-out tariff blocks the year", async () => {
     id: "p", name: "P", status: "suggested",
     components: { electricity: "electricity-energie-erneuerbar-ne7", grid: "grid-netz-400st-ne7", regional_fees: "regional-fees-abgaben-ne7" },
   }] });
-  assert.equal(await publish(root), 1);
-  const report = readJsonFile(path.join(root, "data/tariffs/2026.report.json"));
-  assert.ok(report.issues.some((i: Obj) => i.code === "product_unknown_tariff"));
+  assert.ok(buildUtility(root) > 0);
+  const year = readJsonFile(path.join(root, "data/checks.json")).tariffs[0];
+  assert.ok(year.issues.some((i: Obj) => i.code === "product_unknown_tariff"));
 });
 
 test("windows follow VSE 1.0.1: 23:59 ends the day, from is less than to", () => {
@@ -381,12 +382,13 @@ test("an end of day as 00:00 or 24:00 becomes 23:59, and 00:00 to 23:59 counts a
   assert.deepEqual(errors(constantIssues), []);
 });
 
-test("the file states its VSE version, its engine and what the source followed", async () => {
+test("the file states its VSE version and engine, checks.json what the source followed", () => {
   const root = repo(ekzLike());
-  assert.equal(await publish(root), 0);
+  assert.equal(buildUtility(root), 0);
   const meta = readJsonFile(path.join(root, "data/tariffs/2026.json"))._meta;
   assert.equal(meta.vseVersion, "1.0.1");
   assert.deepEqual([meta.generator.name, typeof meta.generator.version], ["tariff-core", "string"]);
   // The source writes Su like EKZ, which only 1.0.1 allows.
-  assert.deepEqual(meta.source[0].conformsTo, ["1.0.1"]);
+  const vse = readJsonFile(path.join(root, "data/checks.json")).sources.tariffs[0].vse;
+  assert.deepEqual([vse["1.0.0"].valid, vse["1.0.1"].valid], [false, true]);
 });

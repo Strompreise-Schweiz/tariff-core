@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/dynamic-day/v1.schema.json",
-  "title": "Dynamic tariff document",
-  "description": "VSE dynamic-tariff format (HDN 2025, chapter 7.4) with an additive _meta. Used for archived days and for latest.json.",
+  "title": "Day prices",
+  "description": "One Swiss calendar day in the format of HDN 2025, chapter 7.4, with an additive _meta. Used for data/prices/<id>/ (one price source of the utility) and data/products/<id>/ (every component of a product), and for their latest.json.",
   "type": "object",
   "required": [
     "prices",
@@ -19,7 +19,16 @@
       ]
     },
     "_meta": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "complete"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean",
+          "description": "Every quarter hour of the day has a price per kWh. For latest.json: every day it holds is complete."
+        }
+      }
     },
     "prices": {
       "type": "array",

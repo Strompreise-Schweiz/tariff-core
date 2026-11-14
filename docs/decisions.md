@@ -6,6 +6,45 @@ The FAQ of the VSE makes the OpenAPI definition binding. OpenAPI objects allow a
 `id`, `products` and `_meta` do not break a VSE consumer. An own format would have made this project
 incompatible with the tools that utilities and energy management systems already use.
 
+## Sources are stored unchanged, everything else is built
+
+Every utility has four places: where the data comes from (`config/source.json`), what a person
+changes (`curation/<year>.json`), what is wrong (`data/checks.json`) and what is published (`data/`).
+
+`fetch.ts` only downloads, into `data/sources/`, byte for byte. `build.ts` makes every published file
+from there and from `curation/`, offline. So a published file can always be traced back to a stored
+source plus a correction with a reason, and a new correction also applies to days already published.
+There is no "static" and "dynamic" pipeline any more: the VSE forms `constant`, `multilevel` and
+`dynamic` all live in the yearly file, and only the prices of `dynamic` come from an API. The two
+formats are named after what they hold: `tariffs` (the yearly file) and `prices` (the day prices).
+
+The previous layout of version 3 (`data/static/raw/`, `data/dynamic/<id>/{raw,vse,normalized}/`,
+`status.json`, `vse-conformance.json`, `<year>.report.json`) was replaced without compatibility, at the
+start of the project. The UTC copy `normalized/` was dropped: it held nothing the day files do not.
+
+## The yearly file points to the day prices of this project
+
+The yearly file of a utility has `prices.dynamic.url` pointing to its own API. The published file points
+to `data/prices/<id>/latest.json` instead, and keeps the URL of the utility in `sourceUrl`. The day
+files have no query parameters: GitHub Pages serves files and ignores a query string. A consumer who
+needs a past day takes `<year>/<date>.json`.
+
+## A product day holds every component, per quarter hour
+
+A customer of a dynamic tariff pays more than the dynamic part: a base price, metering, fees, perhaps a
+fixed energy price. `data/products/<id>/` puts all of it into one day file, so a consumer needs one file
+per day and no knowledge of the yearly file. Quarter hours, because smart meters measure in quarter
+hours (HDN 5.3), and an hourly value is four equal quarter-hour values.
+
+Day files are per product, not per tariff, because only a product says which tariffs belong together.
+A dynamic tariff in several products (EKZ energy with four grid clusters from 2027) appears in each.
+
+## A day without prices per kWh is incomplete
+
+On 2026-11-14 the EKZ API answered with 96 intervals that had only the monthly base `CHF_m` and no price
+per kWh, before it published the day. The old check counted intervals and called it complete. Now
+every interval must have a price per kWh.
+
 ## Products are curated, not derived
 
 The VSE format has no link between `electricity`, `grid`, `metering` and `regional_fees`. EKZ confirmed
@@ -25,8 +64,8 @@ a similar load pattern. It is not a region: EKZ names no municipalities, assigns
 and shows the assignment in myEKZ. So this project cannot derive a cluster from an address.
 
 Each cluster is therefore one tariff with its own `id` and stable URL, and one product with a `selection`
-field saying how a customer finds out which applies. The tariffs carry `valid_from` and `valid_to` in
-`config/source.json`, because the tariff names can change at the turn of the year. Other utilities with local
+field saying how a customer finds out which applies. The price sources carry `valid_from` and `valid_to`
+in `config/source.json`, because the tariff names can change at the turn of the year. Other utilities with local
 differentiation (HDN 5.5) work the same way. If a utility publishes a mapping one day, it fits in `selection`.
 
 ## One repo for everything shared
@@ -52,7 +91,7 @@ So a utility lives in exactly one place:
   an own repo. One workflow run covers all of them, and corrections arrive as pull requests.
 
 The engine accepts both: run from a repo root it processes either the one utility or every folder
-under `utilities/`. `validate.ts` rejects enabled dynamic tariffs in the hub and a folder name that
+under `utilities/`. `validate.ts` rejects enabled price sources in the hub and a folder name that
 differs from `slug`. A utility is never split between both places.
 
 ## Own domain through GitHub Pages
@@ -68,7 +107,7 @@ https://data.strompreise-schweiz.ch/<slug>/index.json     one utility, hub or ow
 ```
 
 Moving a utility means removing its hub folder and enabling Pages in its repo, or the reverse.
-No URL changes. A Pages site is limited to 1 GB, so it serves the dynamic archive of the current year
+No URL changes. A Pages site is limited to 1 GB, so it serves the day files of the current year
 only. Older years stay in git and on `raw.githubusercontent.com`.
 
 ## Repository names
@@ -89,8 +128,8 @@ so the project has one language and one toolchain.
   the major version Vercel uses by default.
 - `engine/core/` uses no Node APIs. Swiss time comes from `Intl`, which every browser has, and the
   short hash in tariff ids is FNV-1a, because Web Crypto has no synchronous hash.
-- Dependencies stay few: `ajv` and `ajv-formats` for JSON Schema. The dynamic pipeline and the site
-  build need no packages.
+- Dependencies stay few: `ajv` and `ajv-formats` for JSON Schema. `fetch.ts` and the site build need
+  no packages.
 - Nothing was in production yet, so the move did not keep Python's quirks. Run on copies of all
   repos, the new engine produced the same tariff data, products and issue codes. Ids of tariffs that
   share a name got a new hash suffix, and messages are worded differently.
@@ -101,9 +140,8 @@ The VSE format uses Swiss local time. That is fine, because with an offset every
 exactly one instant: `2026-10-25T02:30:00+02:00` and `2026-10-25T02:30:00+01:00` are one hour apart.
 It also fits how the data is used: tariff days, invoices and price sheets follow the Swiss calendar.
 
-- Publishing: Swiss local time with mandatory offset (`vse/`, `latest.json`).
-- Computing across sources: UTC (`normalized/`).
-- Static windows such as "07:00 to 20:00": wall-clock time without offset. High tariff starts at 07:00
+- Day prices: Swiss local time with mandatory offset (`prices/`, `products/`, `latest.json`).
+- Time windows of the yearly file such as "07:00 to 20:00": wall-clock time without offset. High tariff starts at 07:00
   in summer and winter. Converting these to UTC would be wrong.
 
 Local time without an offset is rejected, because the hour from 02:00 to 03:00 exists twice in October.
@@ -114,7 +152,7 @@ The risk lies in the handling of clock changes. On 2026-10-25, a 25-hour day, EK
 ## Source omissions are reported, not filled
 
 EKZ omits the voltage level on electricity, metering and fee tariffs for 2027, although the OpenAPI requires it.
-Setting a level would be a guess, so the field stays absent and a warning appears in `_meta.issues`. Here the
+Setting a level would be a guess, so the field stays absent and a warning appears in `checks.json`. Here the
 published file is less strict than the OpenAPI, and strict VSE consumers may reject those entries.
 
 ## Incomplete days are flagged, not filled
@@ -135,7 +173,7 @@ The fetcher now names `tariff_name` and the day, and looks back three days to cl
 
 ## A broken tariff is left out, not the whole year
 
-A tariff with an error of its own is removed from the published file and listed in `_meta.excluded`
+A tariff with an error of its own is removed from the published file and listed in `checks.json`
 with its problems. The rest of the year is published. Before, one broken tariff blocked the year: at
 BKW in November 2026, a municipality number `#N/A` in 9 of about 1000 tariffs kept all of them back.
 

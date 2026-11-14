@@ -1,24 +1,27 @@
-name: Reusable publish static tariffs
+name: Reusable update
+
+# Downloads what the utility publishes (engine/fetch.ts), builds every published file from it and
+# from curation/ (engine/build.ts), and commits data/. Works in an org repo and in the hub repo.
 
 on:
   workflow_call:
     inputs:
+      fetch:
+        description: "What to download first: tariffs, prices, all or none (none rebuilds from data/sources/)"
+        required: false
+        type: string
+        default: all
       engine-ref:
         description: "Ref of tariff-core to use for the engine"
         required: false
         type: string
         default: main
-      offline:
-        description: "Rebuild from the stored raw files without fetching"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
 
 jobs:
-  publish:
+  update:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,15 +45,28 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefix _engine --omit=dev
 
-      - name: Publish static tariffs
-        id: publish
+      - name: Fetch
+        id: fetch
+        if: inputs.fetch != 'none'
         continue-on-error: true
         env:
-          OFFLINE_FLAG: ${{ inputs.offline && '--offline' || '' }}
-        # OFFLINE_FLAG is empty or a single fixed word, so it stays unquoted on purpose.
-        run: node _engine/engine/publish-static.ts $OFFLINE_FLAG
+          FETCH: ${{ inputs.fetch }}
+        run: |
+          case "$FETCH" in
+            tariffs) node _engine/engine/fetch.ts --tariffs ;;
+            prices) node _engine/engine/fetch.ts --prices ;;
+            all) node _engine/engine/fetch.ts ;;
+            *) echo "::error::fetch must be tariffs, prices, all or none, not $FETCH"; exit 2 ;;
+          esac
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: node _engine/engine/build.ts
 
       - name: Commit and push if changed
+        env:
+          FETCH: ${{ inputs.fetch }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -62,15 +78,15 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "data: static tariffs $(TZ=Europe/Zurich date +%Y-%m-%d)"
+          git commit -m "data: update ($FETCH) $(TZ=Europe/Zurich date +%Y-%m-%d)"
           for attempt in 1 2 3; do
             git pull --rebase --quiet && git push && exit 0
             sleep $((attempt * 10))
           done
           exit 1
 
-      - name: Fail the run if a year could not be published
-        if: steps.publish.outcome == 'failure'
+      - name: Fail the run if something is missing or wrong
+        if: steps.fetch.outcome == 'failure' || steps.build.outcome == 'failure'
         run: |
-          echo "::error::Static tariffs have errors. See the publish step and data/tariffs/<year>.report.json."
+          echo "::error::Fetch or build reported errors. See their steps and data/checks.json."
           exit 1

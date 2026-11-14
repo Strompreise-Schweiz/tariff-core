@@ -26,15 +26,26 @@ export interface TimePrice extends SimplePrice {
   to: string;
 }
 
+export interface RegionalTax extends Open {
+  municipalityNumber?: number;
+  municipalityName?: string;
+  municipalityBase?: SimplePrice;
+  municipalityEnergy?: TimePrice[];
+  cantonName?: string;
+  cantonBase?: SimplePrice;
+  cantonEnergy?: TimePrice[];
+}
+
 export interface Prices extends Open {
   base?: SimplePrice;
   energy?: TimePrice[];
   power?: TimePrice[];
   reactivePower?: TimePrice[];
   refundStorage?: SimplePrice;
-  dynamic?: { url: string };
-  municipalityTaxes?: Open[];
-  cantonalTaxes?: Open[];
+  /** url: the published day prices of this project. sourceUrl: the API of the utility. */
+  dynamic?: { url: string; sourceUrl?: string };
+  municipalityTaxes?: RegionalTax[];
+  cantonalTaxes?: RegionalTax[];
 }
 
 export interface Tariff extends Open {
@@ -59,6 +70,7 @@ export interface Product extends Open {
   name: string;
   status: "suggested" | "verified";
   sourceUrl?: string;
+  note?: string;
   components: Partial<Record<TariffType, string>>;
   selection?: { kind: string; value: string; howToFind?: string };
 }
@@ -80,6 +92,15 @@ export interface Issue {
   acceptReason?: string;
 }
 
+/** A file of a utility, as stored in data/sources/. */
+export interface SourceRef {
+  name: string;
+  url?: string;
+  file?: string;
+  sha256: string;
+}
+
+/** data/tariffs/<year>.json: a VSE file with additions. */
 export interface TariffDocument {
   $schema?: string;
   dsoName: string;
@@ -88,19 +109,17 @@ export interface TariffDocument {
     /** Version of the format of this project. */
     schemaVersion: string;
     /** Version of the VSE OpenAPI definition the file follows. */
-    vseVersion?: string;
-    /** The engine that wrote the file, such as tariff-core 3.1.0. */
-    generator?: { name: string; version: string; url: string };
+    vseVersion: string;
+    /** The engine that wrote the file, such as tariff-core 4.0.0. */
+    generator: { name: string; version: string; url: string };
     year: number;
-    generatedAt?: string;
-    /** The files of the utility. conformsTo lists the VSE versions a source follows as published. */
-    source: { name: string; url?: string; file?: string; sha256: string; conformsTo?: string[] }[];
-    pricesExcludeVat?: boolean;
+    pricesExcludeVat: true;
+    /** The files of the utility this file was built from. */
+    source: SourceRef[];
+    /** Automatic repairs of deviations from the VSE format. */
     repairs: Repair[];
-    overrides: AppliedCuration[];
-    issues?: Issue[];
-    /** Tariffs of the source that were left out because of errors of their own. */
-    excluded?: ExcludedTariff[];
+    /** The corrections from curation/<year>.json. */
+    corrections: AppliedCuration[];
   };
   tariffs: Tariff[];
   products: Product[];
@@ -108,11 +127,24 @@ export interface TariffDocument {
 
 export type TariffMatch = Partial<Pick<Tariff, "tariffName" | "tariffType" | "customerVoltageLevel" | "customerType">>;
 
+/** A correction of day prices: replaces components of every interval in the date range. */
+export interface PriceCorrection {
+  /** Id of the price source in config/source.json. */
+  prices: string;
+  from?: string;
+  to?: string;
+  set: Record<string, ComponentPrice[]>;
+  reason: string;
+  sourceUrl?: string;
+}
+
+/** curation/<year>.json: everything a person changes, each with a reason. */
 export interface Curation {
   year?: number;
   overrides?: { match: TariffMatch; set: Record<string, unknown>; reason: string; sourceUrl?: string }[];
   removeTariffs?: { match: TariffMatch; reason: string }[];
   addTariffs?: { tariff: Tariff; reason: string; sourceUrl?: string }[];
+  prices?: PriceCorrection[];
   products?: Product[];
   acceptIssues?: Waiver[];
 }
@@ -128,38 +160,33 @@ export type AppliedCuration =
   | { action: "override"; match: TariffMatch; set: string[]; reason: string; sourceUrl?: string; count: number }
   | { action: "add"; tariffName: string; reason: string; sourceUrl?: string };
 
-export interface AddedComponent {
-  tariff_type: string;
-  unit: string;
-  value: number;
-  reason: string;
-  valid_from?: string;
-  valid_to?: string;
-}
-
-export interface DynamicTariffConfig {
-  id: string;
-  name: string;
-  enabled?: boolean;
-  api_url: string;
-  query?: Record<string, string | number | boolean>;
-  components?: string[];
-  normalizer?: string;
-  component_map?: Record<string, string>;
-  add_components?: AddedComponent[];
-  backfill_days?: number;
-  alert_after_hour?: number;
-  valid_from?: string;
-  valid_to?: string;
-}
-
-export interface StaticSource {
+/** A yearly tariff file of the utility. */
+export interface TariffSource {
   name: string;
   url?: string;
+  /** A hand-written file in the repo, for a utility without usable JSON. */
   file?: string;
   enabled?: boolean;
+  note?: string;
 }
 
+/** An API with day prices, in the format of HDN 2025 chapter 7.4. */
+export interface PriceSource {
+  id: string;
+  name: string;
+  /** As in prices.dynamic.url of the yearly file, with tariff_name. The day window is added. */
+  url: string;
+  enabled?: boolean;
+  valid_from?: string;
+  valid_to?: string;
+  /** Component names the API uses, mapped to those of HDN table 3, such as {"dso": "grid"}. */
+  component_map?: Record<string, string>;
+  backfill_days?: number;
+  alert_after_hour?: number;
+  note?: string;
+}
+
+/** config/source.json: where the data comes from. */
 export interface SourceConfig {
   slug: string;
   name: string;
@@ -168,8 +195,8 @@ export interface SourceConfig {
   vse_id: string;
   elcom_id?: number;
   data_license?: string;
-  dynamic: DynamicTariffConfig[];
-  static: { sources: StaticSource[] };
+  tariffs: TariffSource[];
+  prices: PriceSource[];
 }
 
 export interface ComponentPrice {
@@ -177,7 +204,7 @@ export interface ComponentPrice {
   value: number;
 }
 
-/** One interval of a dynamic tariff. Every key besides the timestamps is a component such as grid. */
+/** One interval. Every key besides the timestamps is a component such as grid. */
 export interface PriceInterval {
   start_timestamp: string;
   end_timestamp: string;
@@ -189,14 +216,13 @@ export interface DayCheck {
   issues: string[];
   resolution_minutes: number | null;
   interval_count: number;
-  expected_interval_count: number | null;
   day_length_hours: number;
 }
 
-/** A VSE day file in vse/<year>/<date>.json or latest.json. Files archived before 2.0 have no _meta. */
-export interface DynamicDay {
+/** data/prices/<id>/... and data/products/<id>/...: HDN format with _meta. */
+export interface PriceDay {
   $schema?: string;
   publication_timestamp: string | null;
-  _meta?: { complete?: boolean; [key: string]: unknown };
+  _meta: { complete: boolean; [key: string]: unknown };
   prices: PriceInterval[];
 }

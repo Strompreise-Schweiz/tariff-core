@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/curation/v1.schema.json",
   "title": "Manual corrections and product mapping (curation/<year>.json)",
-  "description": "Everything a person adds to a utility's data. Every correction needs a reason, so the published file stays traceable.",
+  "description": "Everything a person changes in the data of a utility: corrections of the yearly file, corrections of day prices, products and accepted issues. Every correction needs a reason, so the published files stay traceable.",
   "type": "object",
   "required": [
     "year"
@@ -108,6 +108,66 @@
         "properties": {
           "tariff": {
             "type": "object"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "prices": {
+      "type": "array",
+      "description": "Corrections of day prices. Each replaces whole components in every interval of the days from to to, in this year.",
+      "items": {
+        "type": "object",
+        "required": [
+          "prices",
+          "set",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "prices": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Id of the price source in config/source.json."
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "set": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "Component name, such as grid or metering, and its prices.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "unit",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "unit": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
           },
           "reason": {
             "type": "string",

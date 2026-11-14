@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { DynamicDay } from "../core/types.ts";
+import type { PriceDay } from "../core/types.ts";
 
 export const exists = existsSync;
 
@@ -51,10 +51,10 @@ export function writeJson(file: string, value: unknown): void {
 }
 
 /**
- * Write a VSE day document with one interval per line. That keeps files about half the size of
+ * Write a day file with one interval per line. That keeps files about half the size of
  * indented JSON and keeps git diffs readable.
  */
-export function writeDayFile(file: string, document: DynamicDay): void {
+export function writeDayFile(file: string, document: PriceDay): void {
   const { prices, ...head } = document;
   const lines = prices.map((interval) => JSON.stringify(interval)).join(",\n    ");
   writeFile(file, `${JSON.stringify(head, null, 2).slice(0, -2)},\n  "prices": [\n    ${lines}\n  ]\n}\n`);

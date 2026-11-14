@@ -6,7 +6,7 @@ import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.
 import ajvFormats from "ajv-formats";
 
 import curation from "../../schemas/curation/v1.schema.json" with { type: "json" };
-import dynamicDay from "../../schemas/dynamic-day/v1.schema.json" with { type: "json" };
+import priceDay from "../../schemas/price-day/v1.schema.json" with { type: "json" };
 import overallIndex from "../../schemas/overall-index/v1.schema.json" with { type: "json" };
 import sourceConfig from "../../schemas/source-config/v1.schema.json" with { type: "json" };
 import supplier from "../../schemas/supplier/v1.schema.json" with { type: "json" };
@@ -16,7 +16,7 @@ import type { Issue } from "./types.ts";
 
 export const SCHEMAS = {
   curation,
-  "dynamic-day": dynamicDay,
+  "price-day": priceDay,
   "overall-index": overallIndex,
   "source-config": sourceConfig,
   supplier,

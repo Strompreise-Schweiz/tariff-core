@@ -19,21 +19,17 @@ Usage:  node ../tariff-core/engine/build-site.ts [--out _site]
                status page              -> <out>/status.html served as /status.html
 
 The hub repo is the organization site, an org repo a project site below it, so a utility has the
-same URL in both places. A Pages site is limited to 1 GB, so the dynamic archive is served for the
-current year only. Older years stay in git and on raw.githubusercontent.com.
+same URL in both places. A Pages site is limited to 1 GB, so day files are served for the current
+year only. Older years stay in git and on raw.githubusercontent.com.
 `;
 
-const ARCHIVE_DIRS = new Set(["raw", "vse", "normalized"]);
 // Warn well before the 1 GB limit of a Pages site.
 const WARN_BYTES = 800 * 1024 * 1024;
 const MB = 1024 * 1024;
 
-/** True for dynamic/<id>/(raw|vse|normalized)/<year>/... with a past year. */
+/** True for a day file in a year folder of a past year, such as prices/<id>/2025/2025-07-01.json. */
 export function isOldArchive(relative: string, currentYear: number): boolean {
-  const parts = relative.split(path.sep);
-  if (parts[0] !== "dynamic") return false;
-  const archive = parts.findIndex((part, i) => ARCHIVE_DIRS.has(part) && /^\d{4}$/.test(parts[i + 1] ?? ""));
-  return archive >= 0 && Number(parts[archive + 1]) < currentYear;
+  return relative.split(path.sep).slice(0, -1).some((part) => /^\d{4}$/.test(part) && Number(part) < currentYear);
 }
 
 /** Copy one utility's data/ folder. Returns the bytes copied. */
@@ -102,7 +98,7 @@ export function buildSite(cwd: string, out: string): number {
       return 1;
     }
     writeJson(path.join(out, "index.json"), index);
-    // The status page reads every utility's status.json from this domain.
+    // The status page reads every utility's checks.json from this domain.
     copyFileSync(path.join(ENGINE_ROOT, "site", "status.html"), path.join(out, "status.html"));
   }
   if (total > WARN_BYTES) annotate("warning", `site is ${Math.round(total / MB)} MB, GitHub Pages allows 1 GB`);

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/tariff-document/v1.schema.json",
-  "title": "Static tariff document",
-  "description": "VSE TariffSubmission (OpenAPI 1.0.1) with additive fields: tariffs[].id, products and _meta. A consumer of the VSE format can read this file unchanged.",
+  "title": "Yearly tariff document",
+  "description": "VSE TariffSubmission (OpenAPI 1.0.1) with additive fields: tariffs[].id, prices.dynamic.sourceUrl, products and _meta. A consumer of the VSE format can read this file unchanged.",
   "type": "object",
   "required": [
     "dsoName",
@@ -38,13 +38,70 @@
     },
     "_meta": {
       "type": "object",
+      "description": "Additive. How the file was built: from which files of the utility, with which automatic repairs and which corrections. The checks are in data/checks.json.",
       "required": [
         "schemaVersion",
+        "vseVersion",
+        "generator",
         "year",
+        "pricesExcludeVat",
         "source",
         "repairs",
-        "overrides"
-      ]
+        "corrections"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "string"
+        },
+        "vseVersion": {
+          "type": "string"
+        },
+        "generator": {
+          "type": "object",
+          "required": [
+            "name",
+            "version",
+            "url"
+          ]
+        },
+        "year": {
+          "type": "integer"
+        },
+        "pricesExcludeVat": {
+          "const": true
+        },
+        "source": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "sha256"
+            ]
+          }
+        },
+        "repairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "code",
+              "detail",
+              "count"
+            ]
+          }
+        },
+        "corrections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "action",
+              "reason"
+            ]
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -168,7 +225,13 @@
           "properties": {
             "url": {
               "type": "string",
-              "format": "uri"
+              "format": "uri",
+              "description": "The day prices of this tariff as published by this project, data/prices/<id>/latest.json. The URL of the utility if no price source is configured for it."
+            },
+            "sourceUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Additive. The API of the utility, as in its own file."
             }
           }
         },

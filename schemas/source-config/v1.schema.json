@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/source-config/v1.schema.json",
-  "title": "Org repo configuration (config/source.json)",
+  "title": "Where the data of a utility comes from (config/source.json)",
   "type": "object",
   "required": [
     "slug",
     "name",
     "vse_id",
-    "dynamic",
-    "static"
+    "tariffs",
+    "prices"
   ],
   "additionalProperties": false,
   "properties": {
@@ -41,94 +41,98 @@
     "data_license": {
       "type": "string"
     },
-    "dynamic": {
+    "tariffs": {
       "type": "array",
+      "description": "The yearly tariff files of the utility, in the VSE format. Stored unchanged in data/sources/tariffs/<name>.json.",
       "items": {
         "type": "object",
         "required": [
-          "id",
-          "name",
-          "api_url"
+          "name"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
         ],
         "additionalProperties": false,
         "properties": {
-          "id": {
+          "name": {
             "type": "string",
             "pattern": "^[a-z0-9-]+$"
           },
-          "name": {
-            "type": "string"
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "file": {
+            "type": "string",
+            "description": "Hand-written file in VSE format in this repo, for a utility without a usable publication."
           },
           "enabled": {
             "type": "boolean",
             "default": true
           },
-          "api_url": {
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "prices": {
+      "type": "array",
+      "description": "The APIs with day prices (HDN 2025, chapter 7.4). Each response is stored unchanged in data/sources/prices/<id>/<year>/<date>.json.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
             "type": "string",
-            "format": "uri"
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Stable name, part of the URL data/prices/<id>/."
           },
-          "query": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
+          "name": {
+            "type": "string"
           },
-          "components": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "normalizer": {
+          "url": {
             "type": "string",
-            "default": "generic_vse"
+            "format": "uri",
+            "description": "As in prices.dynamic.url of the yearly file, with tariff_name. That is how a dynamic tariff finds its prices. start_timestamp and end_timestamp are added per day."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "false: no longer fetched. The stored days are still published."
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "valid_to": {
+            "type": "string",
+            "format": "date"
           },
           "component_map": {
             "type": "object",
+            "description": "Component names of the API mapped to those of HDN table 3, such as {\"dso\": \"grid\"}.",
             "additionalProperties": {
               "type": "string"
-            }
-          },
-          "add_components": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "tariff_type",
-                "unit",
-                "value",
-                "reason"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "tariff_type": {
-                  "type": "string"
-                },
-                "unit": {
-                  "type": "string"
-                },
-                "value": {
-                  "type": "number"
-                },
-                "reason": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "valid_from": {
-                  "type": "string",
-                  "format": "date"
-                },
-                "valid_to": {
-                  "type": "string",
-                  "format": "date"
-                }
-              }
             }
           },
           "backfill_days": {
             "type": "integer",
-            "minimum": 0,
-            "maximum": 30
+            "minimum": 0
           },
           "alert_after_hour": {
             "type": "integer",
@@ -137,69 +141,6 @@
           },
           "note": {
             "type": "string"
-          },
-          "valid_from": {
-            "type": "string",
-            "format": "date",
-            "description": "First day with prices. Tariffs often exist only for one year."
-          },
-          "valid_to": {
-            "type": "string",
-            "format": "date",
-            "description": "Last day with prices. After it the tariff is no longer fetched, and latest.json stays as it is."
-          }
-        }
-      }
-    },
-    "static": {
-      "type": "object",
-      "required": [
-        "sources"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "sources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "name"
-            ],
-            "oneOf": [
-              {
-                "required": [
-                  "url"
-                ]
-              },
-              {
-                "required": [
-                  "file"
-                ]
-              }
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z0-9-]+$",
-                "description": "File name under data/static/raw/."
-              },
-              "url": {
-                "type": "string",
-                "format": "uri"
-              },
-              "file": {
-                "type": "string",
-                "description": "Hand-written source in VSE format, for utilities without a usable publication."
-              },
-              "enabled": {
-                "type": "boolean",
-                "default": true
-              },
-              "note": {
-                "type": "string"
-              }
-            }
           }
         }
       }

@@ -3,7 +3,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { checkAllVersions } from "../engine/lib/conformance.ts";
-import { publish } from "../engine/publish-static.ts";
+import { build } from "../engine/build.ts";
 import { ekzLike, price, readJsonFile, setNow, tempDir, writeJsonFile } from "./helpers.ts";
 
 /** A file that follows 1.0.0 to the letter. */
@@ -43,21 +43,22 @@ test("errors are grouped by rule and path", () => {
   assert.deepEqual(summary, [{ path: "tariffs/*/startDate", message: 'must match format "date"', count: 2 }]);
 });
 
-test("publishing records the conformance of source and output, with badges", async () => {
+test("the build records the conformance of source and output, with badges", () => {
   const root = tempDir();
   writeJsonFile(path.join(root, "curation/source.json"), ekzLike());
   writeJsonFile(path.join(root, "config/source.json"), {
-    slug: "muster", name: "Muster", vse_id: "CH10000000001", dynamic: [],
-    static: { sources: [{ name: "main", file: "curation/source.json" }] },
+    slug: "muster", name: "Muster", vse_id: "CH10000000001", prices: [],
+    tariffs: [{ name: "main", file: "curation/source.json" }],
   });
   setNow("2026-11-02T10:00:00Z");
-  assert.equal(await publish(root), 0);
-  const report = readJsonFile(path.join(root, "data/vse-conformance.json"));
+  assert.equal(build(root), 0);
+  const checks = readJsonFile(path.join(root, "data/checks.json"));
   // The source writes Su and 23:59 like EKZ: wrong in 1.0.0, right in 1.0.1.
-  assert.deepEqual([report.sources[0].results["1.0.0"].valid, report.sources[0].results["1.0.1"].valid], [false, true]);
+  const source = checks.sources.tariffs[0];
+  assert.deepEqual([source.file, source.vse["1.0.0"].valid, source.vse["1.0.1"].valid], ["curation/source.json", false, true]);
   // The published file is written in 1.0.1, with Su.
-  assert.deepEqual(report.published.map((p: any) => [p.file, p.results["1.0.0"].valid, p.results["1.0.1"].valid]), [["tariffs/2026.json", false, true]]);
+  assert.deepEqual(checks.tariffs.map((y: any) => [y.year, y.vse["1.0.0"].valid, y.vse["1.0.1"].valid]), [[2026, false, true]]);
   assert.deepEqual(readJsonFile(path.join(root, "data/badges/vse-1.0.1.json")), { schemaVersion: 1, label: "VSE 1.0.1", message: "valid", color: "brightgreen" });
   assert.equal(readJsonFile(path.join(root, "data/badges/vse-1.0.0.json")).message, "invalid");
-  assert.ok(readJsonFile(path.join(root, "data/index.json")).vse_conformance.endsWith("/data/vse-conformance.json"));
+  assert.equal(readJsonFile(path.join(root, "data/index.json")).checks, "https://data.strompreise-schweiz.ch/muster/checks.json");
 });

@@ -8,19 +8,19 @@ import { hubIssues } from "../engine/core/rules.ts";
 import { schemaIssues } from "../engine/core/schemas.ts";
 import type { SourceConfig } from "../engine/core/types.ts";
 import { rawUrl, siteUrl, utilityRoots } from "../engine/lib/repo.ts";
-import { main as publishMain, publish } from "../engine/publish-static.ts";
+import { build, main as buildMain } from "../engine/build.ts";
 import { main as validateMain } from "../engine/validate.ts";
 import { ekzLike, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
 
 function addUtility(
-  hub: string, slug: string, { folder, dynamic, elcomId }: { folder?: string; dynamic?: Obj[]; elcomId?: number } = {},
+  hub: string, slug: string, { folder, prices, elcomId }: { folder?: string; prices?: Obj[]; elcomId?: number } = {},
 ): string {
   const root = path.join(hub, "utilities", folder ?? slug);
   writeJsonFile(path.join(root, "curation/source.json"), ekzLike());
   writeJsonFile(path.join(root, "config/source.json"), {
-    slug, name: slug[0].toUpperCase() + slug.slice(1), vse_id: "CH10000000001", dynamic: dynamic ?? [],
+    slug, name: slug[0].toUpperCase() + slug.slice(1), vse_id: "CH10000000001", prices: prices ?? [],
     ...(elcomId ? { elcom_id: elcomId } : {}),
-    static: { sources: [{ name: "main", file: "curation/source.json" }] },
+    tariffs: [{ name: "main", file: "curation/source.json" }],
   });
   return root;
 }
@@ -55,55 +55,55 @@ test("URLs depend on where a utility lives", () => {
   assert.equal(siteUrl("alpha", "data/tariffs/current.json"), "https://data.strompreise-schweiz.ch/alpha/tariffs/current.json");
 });
 
-test("the hub publishes every utility", async () => {
+test("the hub publishes every utility", () => {
   const hub = makeHub();
   addUtility(hub, "alpha");
   addUtility(hub, "beta");
   for (const root of utilityRoots(hub)) {
     const name = path.basename(root);
-    assert.equal(await publish(root), 0);
+    assert.equal(build(root), 0);
     const index = readJsonFile(path.join(root, "data/index.json"));
     assert.equal(index.site, `https://data.strompreise-schweiz.ch/${name}/`);
     assert.ok(index.repository.endsWith(`/strompreise-schweiz.github.io/tree/main/utilities/${name}`));
-    assert.ok(index.static.current.includes(`/utilities/${name}/data/tariffs/current.json`));
+    assert.equal(index.tariffs.current, `https://data.strompreise-schweiz.ch/${name}/tariffs/current.json`);
   }
 });
 
-test("the hub continues after a failing utility", async () => {
+test("the hub continues after a failing utility", () => {
   const hub = makeHub();
   addUtility(hub, "alpha");
   const broken = addUtility(hub, "beta");
   writeJsonFile(path.join(broken, "curation/source.json"), "not json");
-  assert.equal(await publishMain([], hub), 1);
+  assert.equal(buildMain([], hub), 1);
   assert.ok(existsSync(path.join(hub, "utilities/alpha/data/tariffs/2026.json")));
 });
 
 const hubCases: [string | undefined, Obj[] | undefined, string][] = [
   ["other-name", undefined, "slug_mismatch"],
-  [undefined, [{ id: "d", name: "D", api_url: "https://api.example.ch/v1/tariffs" }], "dynamic_in_hub"],
+  [undefined, [{ id: "d", name: "D", url: "https://api.example.ch/v1/tariffs" }], "prices_in_hub"],
 ];
-for (const [folder, dynamic, code] of hubCases) {
+for (const [folder, prices, code] of hubCases) {
   test(`hub rule ${code}`, () => {
-    const root = addUtility(makeHub(), "alpha", { folder, dynamic });
+    const root = addUtility(makeHub(), "alpha", { folder, prices });
     const config = readJsonFile(path.join(root, "config/source.json"));
     assert.ok(hubIssues(path.basename(root), config as SourceConfig).some((i) => i.code === code));
   });
 }
 
-test("a disabled dynamic tariff is allowed in the hub", () => {
-  const root = addUtility(makeHub(), "alpha", { dynamic: [{ id: "d", name: "D", enabled: false, api_url: "https://api.example.ch/v1/tariffs" }] });
+test("a disabled price source is allowed in the hub", () => {
+  const root = addUtility(makeHub(), "alpha", { prices: [{ id: "d", name: "D", enabled: false, url: "https://api.example.ch/v1/tariffs" }] });
   assert.deepEqual(hubIssues(path.basename(root), readJsonFile(path.join(root, "config/source.json")) as SourceConfig), []);
 });
 
-test("the hub validates cleanly", async () => {
+test("the hub validates cleanly", () => {
   const hub = makeHub();
-  for (const root of [addUtility(hub, "alpha"), addUtility(hub, "beta")]) await publish(root);
+  for (const root of [addUtility(hub, "alpha"), addUtility(hub, "beta")]) build(root);
   assert.equal(validateMain([], hub), 0);
 });
 
-test("the site of the hub has one folder per utility and an overall index", async () => {
+test("the site of the hub has one folder per utility and an overall index", () => {
   const hub = makeHub();
-  for (const root of [addUtility(hub, "alpha", { elcomId: 101 }), addUtility(hub, "beta")]) await publish(root);
+  for (const root of [addUtility(hub, "alpha", { elcomId: 101 }), addUtility(hub, "beta")]) build(root);
   writeJsonFile(path.join(hub, "repositories.json"), {
     repositories: [{ slug: "ekz", name: "EKZ", vse_id: "CH10153012345", elcom_id: 486 }],
   });
@@ -127,30 +127,30 @@ test("a utility in the hub and in an own repo is an error", () => {
   assert.equal(buildSite(hub, path.join(hub, "_site")), 1);
 });
 
-test("the site of an org repo serves the current archive year only", () => {
+test("the site of an org repo serves the day files of the current year only", () => {
   setNow("2027-01-05T10:00:00Z");
   const root = tempDir();
-  writeJsonFile(path.join(root, "config/source.json"), { slug: "ekz", name: "EKZ", dynamic: [], static: { sources: [] } });
-  for (const relative of ["dynamic/grid-d/vse/2026/2026-12-31.json", "dynamic/grid-d/vse/2027/2027-01-05.json",
-    "dynamic/grid-d/raw/2026/2026-12-31.json", "dynamic/vse/2026/2026-08-25.json",
-    "dynamic/grid-d/latest.json", "tariffs/2026.json", "index.json"]) {
+  writeJsonFile(path.join(root, "config/source.json"), { slug: "ekz", name: "EKZ", prices: [], tariffs: [] });
+  for (const relative of ["prices/grid-d/2026/2026-12-31.json", "prices/grid-d/2027/2027-01-05.json",
+    "sources/prices/grid-d/2026/2026-12-31.json", "products/p/2026/2026-08-25.json",
+    "prices/grid-d/latest.json", "tariffs/2026.json", "index.json"]) {
     writeJsonFile(path.join(root, "data", relative), {});
   }
   assert.equal(buildSite(root, path.join(root, "_site")), 0);
   const site = path.join(root, "_site");
   const served = readdirSync(site, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile()).map((e) => path.relative(site, path.join(e.parentPath, e.name))).sort();
-  assert.deepEqual(served, ["dynamic/grid-d/latest.json", "dynamic/grid-d/vse/2027/2027-01-05.json", "index.json", "tariffs/2026.json"]);
+  assert.deepEqual(served, ["index.json", "prices/grid-d/2027/2027-01-05.json", "prices/grid-d/latest.json", "tariffs/2026.json"]);
 });
 
-test("the hub site has the status page, and each utility a status.json", async () => {
+test("the hub site has the status page, and each utility a checks.json", () => {
   const hub = makeHub();
   const root = addUtility(hub, "alpha");
-  await publish(root);
-  const status = readJsonFile(path.join(root, "data/status.json"));
-  assert.deepEqual(status.years.map((y: Obj) => [y.year, y.blocked, y.online, y.errors]), [[2026, false, true, 0]]);
-  assert.deepEqual(Object.keys(status.vse.sources[0]), ["name", "1.0.0", "1.0.1"]);
+  build(root);
+  const checks = readJsonFile(path.join(root, "data/checks.json"));
+  assert.deepEqual(checks.tariffs.map((y: Obj) => [y.year, y.published, y.online]), [[2026, true, true]]);
+  assert.equal(checks.summary.errors, 0);
   assert.equal(buildSite(hub, path.join(hub, "_site")), 0);
   assert.ok(existsSync(path.join(hub, "_site/status.html")));
-  assert.ok(existsSync(path.join(hub, "_site/alpha/status.json")));
+  assert.ok(existsSync(path.join(hub, "_site/alpha/checks.json")));
 });

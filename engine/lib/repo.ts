@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseTimestamp, inUtc, type Moment } from "../core/time.ts";
-import type { DynamicTariffConfig, SourceConfig } from "../core/types.ts";
+import type { SourceConfig } from "../core/types.ts";
 import { exists, namesIn, readJson } from "./files.ts";
 
 export const ORG = "Strompreise-Schweiz";
@@ -44,8 +44,34 @@ export function inHub(root: string): boolean {
   return path.basename(path.dirname(path.resolve(root))) === HUB_DIR;
 }
 
-export function dynamicDir(root: string, tariff: DynamicTariffConfig): string {
-  return path.join(root, "data", "dynamic", tariff.id);
+/**
+ * The layout of data/, the same in every utility:
+ *
+ *     sources/tariffs/<name>.json             yearly file of the utility, unchanged
+ *     sources/prices/<id>/<year>/<date>.json  API response, unchanged
+ *     tariffs/<year>.json, current.json       yearly file, repaired and corrected
+ *     prices/<id>/<year>/<date>.json          day prices of one API, corrected
+ *     products/<id>/<year>/<date>.json        every component of a product, per quarter hour
+ *     checks.json                             what is wrong with all of the above
+ */
+export const paths = {
+  data: (root: string) => path.join(root, "data"),
+  tariffSource: (root: string, name: string) => path.join(root, "data", "sources", "tariffs", `${name}.json`),
+  priceSources: (root: string, id: string) => path.join(root, "data", "sources", "prices", id),
+  tariffs: (root: string) => path.join(root, "data", "tariffs"),
+  prices: (root: string, id: string) => path.join(root, "data", "prices", id),
+  products: (root: string, id: string) => path.join(root, "data", "products", id),
+  checks: (root: string) => path.join(root, "data", "checks.json"),
+};
+
+/** <dir>/<year>/<date>.json */
+export function dayPath(dir: string, day: string): string {
+  return path.join(dir, day.slice(0, 4), `${day}.json`);
+}
+
+/** The dates of the day files below a folder, sorted. */
+export function daysIn(dir: string): string[] {
+  return namesIn(dir, /^\d{4}$/).flatMap((year) => namesIn(path.join(dir, year), /^\d{4}-\d{2}-\d{2}\.json$/)).map((name) => name.slice(0, 10));
 }
 
 /** URL of a file in git, relative to the utility root. Works without the own domain. */

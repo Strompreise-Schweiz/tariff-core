@@ -4,27 +4,24 @@ import path from "node:path";
 import { deepEqual, toJson } from "../core/json.ts";
 import type { SourceConfig } from "../core/types.ts";
 import { exists, namesIn, readJsonIfExists, writeJson } from "./files.ts";
-import { dynamicDir, rawUrl, repositoryUrl, siteUrl } from "./repo.ts";
+import { daysIn, paths, rawUrl, repositoryUrl, siteUrl } from "./repo.ts";
 
-export function writeIndex(root: string, org: SourceConfig): void {
+export interface IndexedProduct {
+  id: string;
+  name: string;
+}
+
+export function writeIndex(root: string, org: SourceConfig, products: IndexedProduct[]): void {
   const { slug } = org;
-  const tariffsDir = path.join(root, "data", "tariffs");
+  const tariffsDir = paths.tariffs(root);
   const years = namesIn(tariffsDir, /^\d{4}\.json$/).map((name) => name.slice(0, 4));
-  const dynamic = org.dynamic
-    .filter((tariff) => tariff.enabled !== false && exists(path.join(dynamicDir(root, tariff), "latest.json")))
-    .map((tariff) => ({
-      id: tariff.id,
-      name: tariff.name,
-      components: tariff.components ?? [],
-      valid_from: tariff.valid_from ?? null,
-      valid_to: tariff.valid_to ?? null,
-      latest: rawUrl(root, slug, `data/dynamic/${tariff.id}/latest.json`),
-      archive: rawUrl(root, slug, `data/dynamic/${tariff.id}/vse/{year}/{date}.json`),
-      source: tariff.api_url,
-    }));
+  const daily = (kind: "prices" | "products", id: string) => ({
+    latest: exists(path.join(paths.data(root), kind, id, "latest.json")) ? siteUrl(slug, `${kind}/${id}/latest.json`) : null,
+    // The site serves the current year, git every year.
+    archive: rawUrl(root, slug, `data/${kind}/${id}/{year}/{date}.json`),
+  });
   const index = toJson({
-    $comment: "Stable entry point for this organization. All URLs below stay valid. " +
-      "Every path under data/ is also served under site.",
+    $comment: "Stable entry point for this utility. Every path under data/ is also served under site.",
     organization: org.name,
     slug,
     vse_id: org.vse_id,
@@ -33,14 +30,16 @@ export function writeIndex(root: string, org: SourceConfig): void {
     license: org.data_license ?? null,
     repository: repositoryUrl(root, slug),
     site: siteUrl(slug, ""),
-    static: {
-      current: exists(path.join(tariffsDir, "current.json")) ? rawUrl(root, slug, "data/tariffs/current.json") : null,
-      years: Object.fromEntries(years.map((year) => [year, rawUrl(root, slug, `data/tariffs/${year}.json`)])),
+    checks: siteUrl(slug, "checks.json"),
+    tariffs: {
+      current: exists(path.join(tariffsDir, "current.json")) ? siteUrl(slug, "tariffs/current.json") : null,
+      years: Object.fromEntries(years.map((year) => [year, siteUrl(slug, `tariffs/${year}.json`)])),
     },
-    vse_conformance: exists(path.join(root, "data", "vse-conformance.json")) ? rawUrl(root, slug, "data/vse-conformance.json") : null,
-    status: exists(path.join(root, "data", "status.json")) ? rawUrl(root, slug, "data/status.json") : null,
-    dynamic,
+    prices: org.prices
+      .filter((source) => daysIn(paths.prices(root, source.id)).length > 0)
+      .map((source) => ({ id: source.id, name: source.name, ...daily("prices", source.id), source: source.url })),
+    products: products.map((product) => ({ id: product.id, name: product.name, ...daily("products", product.id) })),
   });
-  const file = path.join(root, "data", "index.json");
+  const file = path.join(paths.data(root), "index.json");
   if (!deepEqual(readJsonIfExists(file), index)) writeJson(file, index);
 }

@@ -1,13 +1,13 @@
 /**
- * Repairs published static tariff files into the binding VSE OpenAPI shape.
+ * Repairs the yearly tariff file of a utility into the binding VSE OpenAPI shape.
  *
  * The FAQ makes the OpenAPI 3.0.3 definition binding, but utilities also follow the illustrative
  * example in NNMV annex 10 or make small deviations. Every change is logged, so the published file
  * states what differs from the source. Unknown fields (such as standardBasegroup or url at EKZ) are
  * kept: OpenAPI objects allow additional properties. No Node APIs.
  */
-import { compareText, isObject } from "../json.ts";
-import type { Repair, Tariff } from "../types.ts";
+import { compareText, isObject } from "./json.ts";
+import type { Repair, Tariff } from "./types.ts";
 
 /**
  * A source file before repair. Its shape is not known yet: that is what this module fixes. The
@@ -19,7 +19,7 @@ type Loose = Record<string, any>;
 export interface RepairedDocument {
   dsoName: string | null;
   dsoNumber: number | null;
-  /** Repaired, but not yet validated. publish-static.ts assigns the ids. */
+  /** Repaired, but not yet validated. build.ts assigns the ids. */
   tariffs: Omit<Tariff, "id">[];
 }
 
@@ -223,7 +223,7 @@ function foldRefunds(tariffs: Loose[], log: RepairLog): { tariffs: Loose[]; unma
 }
 
 /** The repaired document, the repair log and the problems it cannot repair. */
-export function repairStatic(raw: unknown): { document: RepairedDocument; repairs: Repair[]; problems: string[] } {
+export function repairTariffFile(raw: unknown): { document: RepairedDocument; repairs: Repair[]; problems: string[] } {
   const log = new RepairLog();
   const problems: string[] = [];
   const source: Loose = structuredClone(isObject(raw) ? raw : { tariffs: raw });

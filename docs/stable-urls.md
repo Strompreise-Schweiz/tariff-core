@@ -8,12 +8,14 @@ Use the own domain. It stays the same whether a utility lives in the hub repo or
 https://data.strompreise-schweiz.ch/index.json                        every utility
 https://data.strompreise-schweiz.ch/<slug>/index.json                 all URLs of one utility
 https://data.strompreise-schweiz.ch/<slug>/tariffs/current.json
-https://data.strompreise-schweiz.ch/<slug>/dynamic/<id>/latest.json
+https://data.strompreise-schweiz.ch/<slug>/prices/<id>/latest.json      day prices of one API
+https://data.strompreise-schweiz.ch/<slug>/products/<id>/latest.json    every component of a product
+https://data.strompreise-schweiz.ch/<slug>/checks.json
 ```
 
 The site is GitHub Pages: the hub repo `strompreise-schweiz.github.io` is the organization site with the
-own domain, each org repo a project site under `/<repo>/`. It serves the dynamic archive of the current
-year only, because a Pages site is limited to 1 GB.
+own domain, each org repo a project site under `/<repo>/`. It serves the day files of the current year
+only, because a Pages site is limited to 1 GB.
 
 The same files are also in git, including all archive years:
 

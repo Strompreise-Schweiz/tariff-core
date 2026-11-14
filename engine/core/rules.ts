@@ -4,9 +4,9 @@
  *
  * No Node APIs: this module also runs in the browser, for example to check a file before upload.
  */
-import { checkDay } from "./normalizers/generic-vse.ts";
+import { checkDay } from "./price-day.ts";
 import { schemaIssues } from "./schemas.ts";
-import type { DynamicDay, Issue, Month, Severity, SourceConfig, Tariff, TariffDocument, TimePrice, Waiver, Weekday } from "./types.ts";
+import type { Issue, Month, PriceDay, Severity, SourceConfig, Tariff, TariffDocument, TimePrice, Waiver, Weekday } from "./types.ts";
 
 export { schemaIssues } from "./schemas.ts";
 
@@ -40,7 +40,7 @@ function minutes(time: string): number {
  * The minute ranges [from, to) of a window. Equal times mean the whole day. 23:59 is the end of the
  * day in VSE 1.0.1, so it covers the last minute too, as does 00:00 as end.
  */
-function windowRanges(from: string, to: string): [number, number][] {
+export function windowRanges(from: string, to: string): [number, number][] {
   const start = minutes(from);
   const end = to === "23:59" ? MINUTES_PER_DAY : minutes(to);
   if (start === end) return [[0, MINUTES_PER_DAY]];
@@ -163,10 +163,9 @@ export function applyWaivers(issues: Issue[], waivers: Waiver[] = []): Issue[] {
   });
 }
 
-/** Issues of a dynamic day file or latest.json. fileName is the file name, such as 2026-07-02.json. */
-export function dynamicDayIssues(fileName: string, document: DynamicDay): Issue[] {
-  if (!document._meta) return []; // archived before version 2.0, kept as it was published
-  const issues = schemaIssues(document, "dynamic-day");
+/** Issues of a day file or latest.json under prices/ or products/. fileName is such as 2026-07-02.json. */
+export function priceDayIssues(fileName: string, document: PriceDay): Issue[] {
+  const issues = schemaIssues(document, "price-day");
   if (issues.length || fileName === "latest.json") return issues;
   const check = checkDay(fileName.replace(/\.json$/, ""), document.prices);
   if (check.complete !== document._meta.complete) {
@@ -176,13 +175,13 @@ export function dynamicDayIssues(fileName: string, document: DynamicDay): Issue[
 }
 
 /**
- * Rules for a utility in the hub repo. Dynamic tariffs commit every day and grow the archive, so
- * they belong in an own repo. The folder name is part of the public URL.
+ * Rules for a utility in the hub repo. Day prices commit every day and grow the archive, so they
+ * belong in an own repo. The folder name is part of the public URL.
  */
 export function hubIssues(folder: string, config: SourceConfig): Issue[] {
   const issues: Issue[] = [];
-  if (config.dynamic.some((tariff) => tariff.enabled !== false)) {
-    issues.push(issue("error", "dynamic_in_hub", "a utility with dynamic tariffs needs its own repo"));
+  if (config.prices.some((source) => source.enabled !== false)) {
+    issues.push(issue("error", "prices_in_hub", "a utility with day prices needs its own repo"));
   }
   if (config.slug !== folder) issues.push(issue("error", "slug_mismatch", `folder is ${folder}, slug is ${config.slug}`));
   return issues;

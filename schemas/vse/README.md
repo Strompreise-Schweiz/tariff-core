@@ -1,4 +1,4 @@
-# VSE OpenAPI definitions for static tariffs
+# VSE OpenAPI definitions for yearly tariff files
 
 The binding format for the machine-readable tariff files of Swiss utilities, published by the VSE
 (Verband Schweizerischer Elektrizitätsunternehmen) at
@@ -36,16 +36,16 @@ Unchanged in both: constant prices are one entry with empty `months` and `weekda
   the end of the day is `23:59`, `from` is less than `to`, and a window across midnight is split in two.
   A whole day is `00:00` to `00:00` or `00:00` to `23:59`, kept as the source writes it.
 - **Reading:** sources may follow 1.0.0 or 1.0.1. The repairs in
-  [`engine/core/normalizers/static-vse.ts`](../../engine/core/normalizers/static-vse.ts) write `So` as
+  [`engine/core/tariff-file.ts`](../../engine/core/tariff-file.ts) write `So` as
   `Su`, and the 1.0.1 rules are looser in every other point, so a 1.0.0 file needs no other change. The
   meaning of `municipalityNumber` changed from the historical to the current number of the Federal
   Statistical Office, which no program can convert: the value is kept as published.
-- **Checking:** every file is checked against both versions when static tariffs are published:
+- **Checking:** `build.ts` checks every file against both versions:
 
-  - **sources:** the files as the utility published them, in `data/static/raw/` or `curation/`
-  - **published:** the files of this project, `data/tariffs/<year>.json`
+  - the files as the utility published them, in `data/sources/tariffs/` or as a hand-written file
+  - the files of this project, `data/tariffs/<year>.json`
 
-The result is in `data/vse-conformance.json` of each utility, and in the badges
+The result is in `data/checks.json` of each utility, and in the badges
 `data/badges/vse-<version>.json`, which a README shows through shields.io. It is information only and
 does not block publication: the semantic rules of this project, in
 [`engine/core/rules.ts`](../../engine/core/rules.ts), decide that.

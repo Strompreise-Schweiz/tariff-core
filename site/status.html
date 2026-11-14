@@ -54,19 +54,19 @@
       <thead>
         <tr>
           <th>Utility</th>
-          <th>Static tariffs</th>
+          <th>Yearly file</th>
           <th>File of the utility vs. VSE</th>
           <th>Files of this project vs. VSE</th>
-          <th>Dynamic tariffs</th>
+          <th>Day prices</th>
         </tr>
       </thead>
       <tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody>
     </table>
   </div>
   <ul class="legend">
-    <li><b>Static tariffs:</b> per year whether it is published, and the issues the checks found. A tariff with an error of its own is left out and listed with the reason in <code>_meta.excluded</code> of the file. Errors of the whole file block the year, and the previous file stays online.</li>
+    <li><b>Yearly file:</b> per year whether it is published, and the issues the checks found. A tariff with an error of its own is left out and listed with the reason in <code>checks.json</code>. Errors of the whole file block the year, and the previous file stays online.</li>
     <li><b>VSE:</b> whether a file follows the <a href="https://github.com/Strompreise-Schweiz/tariff-core/tree/main/schemas/vse">OpenAPI definitions of the VSE</a>, version 1.0.0 and 1.0.1. Information only, it does not block publication.</li>
-    <li><b>Dynamic tariffs:</b> the days in <code>latest.json</code> and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
+    <li><b>Day prices:</b> per price source and per product the days in <code>latest.json</code> and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
   </ul>
 </main>
 <script>
@@ -94,25 +94,28 @@ async function getJson(url) {
   }
 }
 
-function staticCell(slug, status) {
-  if (!status) return chip("none", "no status yet", "status.json is written when static tariffs are published");
-  if (!status.years.length) return chip("none", "no static source");
-  return status.years.map((year) => {
-    const codes = Object.entries(year.codes);
-    const state = year.blocked
-      ? chip("bad", `${year.year} blocked`, year.online ? "The previous file stays online" : "No file online")
-      : chip("ok", `${year.year} published`);
+function yearCell(slug, checks) {
+  if (!checks) return chip("none", "no checks yet", "checks.json is written by build.ts");
+  if (!checks.tariffs.length) return chip("none", "no yearly file");
+  return checks.tariffs.map((year) => {
+    const counted = (severity) => year.issues.filter((issue) => issue.severity === severity);
+    const [errors, warnings, accepted] = ["error", "warning", "accepted"].map(counted);
+    const codes = {};
+    for (const issue of [...errors, ...warnings]) codes[issue.code] = (codes[issue.code] ?? 0) + 1;
+    const state = year.published
+      ? chip("ok", `${year.year} published`)
+      : chip("bad", `${year.year} blocked`, year.online ? "The previous file stays online" : "No file online");
     const counts = [
-      year.excluded ? link(`/${slug}/tariffs/${year.year}.json`, chip("warn", `${plural(year.excluded, "tariff")} left out`, "Errors of their own, see _meta.excluded")) : null,
-      year.errors ? link(`/${slug}/tariffs/${year.year}.report.json`, plural(year.errors, "error")) : null,
-      year.warnings ? `${plural(year.warnings, "warning")}` : null,
-      year.accepted ? `${year.accepted} accepted` : null,
+      year.excluded.length ? link(`/${slug}/checks.json`, chip("warn", `${plural(year.excluded.length, "tariff")} left out`, "Errors of their own, see checks.json")) : null,
+      errors.length ? link(`/${slug}/checks.json`, plural(errors.length, "error")) : null,
+      warnings.length ? plural(warnings.length, "warning") : null,
+      accepted.length ? `${accepted.length} accepted` : null,
     ].filter(Boolean);
     return h("div", { class: "line" },
-      year.online && !year.blocked ? h("a", { href: `/${slug}/tariffs/${year.year}.json` }, state) : state,
+      year.online ? h("a", { href: `/${slug}/tariffs/${year.year}.json` }, state) : state,
       counts.length ? h("span", { class: "label" }, ...counts.flatMap((c, i) => (i ? [", ", c] : [c]))) : null,
-      codes.length ? h("details", null, h("summary", null, "issue codes"),
-        h("div", null, ...codes.flatMap(([code, n], i) => [i ? ", " : "", h("code", null, code), ` ${n}`]))) : null);
+      Object.keys(codes).length ? h("details", null, h("summary", null, "issue codes"),
+        h("div", null, ...Object.entries(codes).flatMap(([code, n], i) => [i ? ", " : "", h("code", null, code), ` ${n}`]))) : null);
   });
 }
 
@@ -126,36 +129,35 @@ function vseLine(label, results, href) {
     }));
 }
 
-function vseCell(slug, status, part) {
-  if (!status) return chip("none", "no status yet");
-  const files = status.vse[part];
+function vseCell(slug, checks, part) {
+  if (!checks) return chip("none", "no checks yet");
+  const files = part === "sources" ? checks.sources.tariffs.map((s) => [s.name, s.vse]) : checks.tariffs.filter((y) => y.vse).map((y) => [String(y.year), y.vse]);
   if (!files.length) return chip("none", part === "sources" ? "no source file" : "no file");
-  return files.map((f) => vseLine(part === "sources" ? f.name : f.file.replace("tariffs/", ""), f, `/${slug}/vse-conformance.json`));
+  return files.map(([label, vse]) => vseLine(label, vse, `/${slug}/checks.json`));
 }
 
-async function dynamicCell(slug, index) {
-  const tariffs = index?.dynamic ?? [];
-  if (!tariffs.length) return chip("none", "none");
-  const lines = await Promise.all(tariffs.map(async (tariff) => {
-    const latest = await getJson(`/${slug}/dynamic/${tariff.id}/latest.json`);
+async function daysCell(slug, index) {
+  const entries = [...(index?.prices ?? []).map((p) => ["prices", p]), ...(index?.products ?? []).map((p) => ["products", p])];
+  if (!entries.length) return chip("none", "none");
+  return Promise.all(entries.map(async ([kind, entry]) => {
+    const latest = await getJson(`/${slug}/${kind}/${entry.id}/latest.json`);
     const days = latest?._meta?.days ?? [];
     const hasToday = days.some((d) => d.date === today);
-    return h("div", { class: "line" }, h("span", { class: "label" }, tariff.name ?? tariff.id),
+    return h("div", { class: "line" }, h("span", { class: "label" }, `${kind === "products" ? "product " : ""}${entry.name ?? entry.id}`),
       hasToday ? null : chip("bad", "today missing"),
       ...days.map((d) => chip(d.complete ? "ok" : "warn", `${d.date.slice(5)} ${d.complete ? "complete" : "incomplete"}`)));
   }));
-  return lines;
 }
 
 async function row(utility) {
   const { slug } = utility;
-  const [status, index] = await Promise.all([getJson(`/${slug}/status.json`), getJson(`/${slug}/index.json`)]);
+  const [checks, index] = await Promise.all([getJson(`/${slug}/checks.json`), getJson(`/${slug}/index.json`)]);
   return h("tr", null,
     h("td", null, h("a", { href: utility.repository }, utility.name), h("span", { class: "where" }, utility.maintained_in === "hub" ? "hub repo" : "own repo")),
-    h("td", null, staticCell(slug, status)),
-    h("td", null, vseCell(slug, status, "sources")),
-    h("td", null, vseCell(slug, status, "published")),
-    h("td", null, await dynamicCell(slug, index)));
+    h("td", null, yearCell(slug, checks)),
+    h("td", null, vseCell(slug, checks, "sources")),
+    h("td", null, vseCell(slug, checks, "published")),
+    h("td", null, await daysCell(slug, index)));
 }
 
 (async () => {

@@ -1,5 +1,5 @@
 /** Network access. Tests replace http.fetchBytes. */
-export const USER_AGENT = "strompreise-schweiz-tariff-core/3.0 (+https://github.com/Strompreise-Schweiz/tariff-core)";
+export const USER_AGENT = "strompreise-schweiz-tariff-core/4.0 (+https://github.com/Strompreise-Schweiz/tariff-core)";
 
 export class HttpError extends Error {
   readonly status: number;

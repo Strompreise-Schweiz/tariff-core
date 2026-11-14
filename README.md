@@ -6,7 +6,16 @@ hold only configuration, corrections and generated data and call the reusable wo
 
 - **Hub repo** [`strompreise-schweiz.github.io`](https://github.com/Strompreise-Schweiz/strompreise-schweiz.github.io):
   all utilities with constant and multilevel tariffs only, one folder each under `utilities/<slug>/`.
-- **Own repo** per utility with dynamic tariffs, or one that maintains its data itself (`ekz`, `bkw`, ...).
+- **Own repo** per utility with day prices, or one that maintains its data itself (`ekz`, `bkw`, ...).
+
+Every utility has the same four places, in its own repo or in `utilities/<slug>/` of the hub:
+
+| Question | Place | Changed by |
+|---|---|---|
+| Where does the data come from? | `config/source.json` | a person |
+| What does a person change? | `curation/<year>.json`, each change with a reason | a person |
+| What is wrong with it? | `data/checks.json` | `build.ts` |
+| What is published? | `data/` | `fetch.ts` and `build.ts` |
 
 ```text
 tariff-core                         hub repo / own repo
@@ -18,12 +27,16 @@ tariff-core                         hub repo / own repo
 
 All of it is served under one domain, see [`docs/stable-urls.md`](docs/stable-urls.md).
 
-| Pipeline | Runs | Script | Result |
+| Step | Script | Reads | Writes |
 |---|---|---|---|
-| Dynamic | Daily, in the evening | `engine/fetch-and-normalize.ts` | `data/dynamic/<id>/latest.json` and archive |
-| Static | Weekly, and on changes to `curation/` | `engine/publish-static.ts` | `data/tariffs/<year>.json`, `current.json` |
-| Validation | On push | `engine/validate.ts` | Fails on errors |
-| Site | After each data change | `engine/build-site.ts` | GitHub Pages under `data.strompreise-schweiz.ch` |
+| Download | `engine/fetch.ts` | the URLs in `config/source.json` | `data/sources/`, unchanged |
+| Build | `engine/build.ts` | `data/sources/`, `curation/` | `data/tariffs/`, `data/prices/`, `data/products/`, `data/checks.json`, `data/index.json` |
+| Check | `engine/validate.ts` | everything | nothing, fails on errors |
+| Site | `engine/build-site.ts` | `data/` | GitHub Pages under `data.strompreise-schweiz.ch` |
+
+The workflow [`reusable-update.yml`](.github/workflows/reusable-update.yml) runs download and build:
+daily in the evening for day prices, weekly for the yearly files, and after every change to
+`curation/` or `config/` without download.
 
 ## Documentation
 
@@ -50,12 +63,14 @@ Then from the root of an org repo or of the hub repo, with `tariff-core` next to
 utility under `utilities/` is processed:
 
 ```bash
-node ../tariff-core/engine/fetch-and-normalize.ts     # dynamic (no dependencies)
-node ../tariff-core/engine/publish-static.ts          # static
+node ../tariff-core/engine/fetch.ts                   # download into data/sources/ (--tariffs, --prices)
+node ../tariff-core/engine/build.ts                   # build data/ from data/sources/ and curation/
 node ../tariff-core/engine/validate.ts                # checks
 node ../tariff-core/engine/suggest-products.ts 2026   # product proposals (in the hub: from utilities/<slug>/)
 node ../tariff-core/engine/build-site.ts              # site preview in _site/ (no dependencies)
 ```
+
+After a change to `curation/`, `build.ts` alone is enough: it works offline.
 
 Each script prints its options with `--help`. Tests, from this repo: `npm test` and `npm run typecheck`.
 
@@ -63,7 +78,7 @@ Each script prints its options with `--help`. Tests, from this repo: `npm test` 
 
 ```text
 engine/
-  core/        runs in Node and in the browser: types, repairs, curation, products, validation
+  core/        runs in Node and in the browser: types, repairs, curation, day prices, products, validation
   lib/         Node only: files, repo layout and URLs, HTTP, command line
   *.ts         the scripts the workflows run
 site/          status.html, served by the hub site at data.strompreise-schweiz.ch/status.html
