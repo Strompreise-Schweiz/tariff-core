@@ -27,7 +27,7 @@ year only. Older years stay in git and on raw.githubusercontent.com.
 const WARN_BYTES = 800 * 1024 * 1024;
 const MB = 1024 * 1024;
 
-/** True for a day file in a year folder of a past year, such as prices/<id>/2025/2025-07-01.json. */
+/** True for a day file in a year folder of a past year, such as tariffs/2025/<tariff>/2025-07-01.json. */
 export function isOldArchive(relative: string, currentYear: number): boolean {
   return relative.split(path.sep).slice(0, -1).some((part) => /^\d{4}$/.test(part) && Number(part) < currentYear);
 }

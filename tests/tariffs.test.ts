@@ -7,7 +7,8 @@ import { applyCuration, assignIds } from "../engine/core/curation.ts";
 import { repairTariffFile } from "../engine/core/tariff-file.ts";
 import { suggestProducts as suggest } from "../engine/core/products.ts";
 import { coverageProblems, documentIssues } from "../engine/core/rules.ts";
-import type { Issue, TariffDocument, TimePrice } from "../engine/core/types.ts";
+import { resolveProducts } from "../engine/core/product-spec.ts";
+import type { CuratedProduct, Issue, TariffDocument, TimePrice } from "../engine/core/types.ts";
 import { build as buildUtility } from "../engine/build.ts";
 import { ekzLike, price, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
 
@@ -226,9 +227,33 @@ test("suggestions pair static and dynamic correctly", () => {
 test("product rules", () => {
   const [document] = build(ekzLike());
   const ids = Object.fromEntries(document.tariffs.filter((t: Obj) => t.customerVoltageLevel === 7).map((t: Obj) => [t.tariffName, t.id]));
-  document.products = [{ id: "p", name: "P", status: "verified", components: { electricity: ids["Netz 400ST"], grid: "missing" } }];
-  const found = codes(errors(documentIssues(document as TariffDocument, 2026)));
-  for (const code of ["product_wrong_slot", "product_unknown_tariff", "verified_without_source"]) assert.ok(found.has(code), code);
+  const resolved = resolveProducts([{ id: "p", name: "P", status: "verified", components: { electricity: ids["Netz 400ST"], grid: "missing" } }], document.tariffs);
+  document.products = resolved.products;
+  const found = codes(errors([...resolved.issues, ...documentIssues(document as TariffDocument, 2026)]));
+  for (const code of ["product_wrong_slot", "product_unknown_tariff", "curated_without_source"]) assert.ok(found.has(code), code);
+});
+
+test("each component says where its choice comes from, and the product is verified only without suggestions", () => {
+  const raw = ekzLike();
+  for (const tariff of raw.tariffs) tariff.standardBasegroup = ["Energie Erneuerbar", "Netz 400ST"].includes(tariff.tariffName);
+  const [document] = build(raw);
+  const ids = Object.fromEntries(document.tariffs.filter((t: Obj) => t.customerVoltageLevel === 7).map((t: Obj) => [t.tariffName, t.id]));
+  const curated = { id: "standard", name: "Standard", default: true, components: {
+    electricity: ids["Energie Erneuerbar"], grid: ids["Netz 400ST"], metering: ids["Messung"],
+    regional_fees: { tariff: ids["Abgaben"], basis: "curated" as const, sourceUrl: "https://example.ch/tarife.pdf" },
+  } };
+  const { products, issues } = resolveProducts([curated], document.tariffs);
+  assert.deepEqual(issues, []);
+  assert.deepEqual(Object.fromEntries(Object.entries(products[0].components).map(([slot, c]) => [slot, c.basis])),
+    { electricity: "standardBasegroup", grid: "standardBasegroup", metering: "only", regional_fees: "curated" });
+  assert.equal(products[0].status, "verified");
+  // With a second metering tariff at the same level, the choice is no longer given: it is a suggestion.
+  const second = { ...structuredClone(document.tariffs.find((t: Obj) => t.id === ids["Messung"])), id: "metering-wandler-ne7", tariffName: "Wandler" };
+  const open = resolveProducts([curated], [...document.tariffs, second]);
+  assert.equal(open.products[0].components.metering!.basis, "suggested");
+  assert.equal(open.products[0].status, "suggested");
+  const wrong = resolveProducts([{ ...curated, components: { ...curated.components, grid: { tariff: ids["Netz 400F"], basis: "standardBasegroup" as const } } }], document.tariffs);
+  assert.deepEqual(wrong.issues.map((i) => i.code), ["basis_not_standard"]);
 });
 
 function repo(source: Obj | string): string {
@@ -326,7 +351,7 @@ test("a product selection is valid", () => {
   const [document] = build(ekz2027Like());
   const product: Obj = suggest(document as TariffDocument)[0];
   product.selection = { kind: "grid-cluster", value: "1", howToFind: "Shown in myEKZ" };
-  document.products = [product];
+  document.products = resolveProducts([product as CuratedProduct], document.tariffs).products;
   assert.deepEqual(errors(documentIssues(document as TariffDocument, 2026)), []);
 });
 
@@ -391,4 +416,14 @@ test("the file states its VSE version and engine, checks.json what the source fo
   // The source writes Su like EKZ, which only 1.0.1 allows.
   const vse = readJsonFile(path.join(root, "data/checks.json")).sources.tariffs[0].vse;
   assert.deepEqual([vse["1.0.0"].valid, vse["1.0.1"].valid], [false, true]);
+});
+
+test("the pair the utility marks as standard is suggested as the default product", () => {
+  const document = ekzLike();
+  for (const tariff of document.tariffs) tariff.standardBasegroup = ["Energie Erneuerbar", "Netz 400ST"].includes(tariff.tariffName);
+  const documented = { ...document, tariffs: assignIds(document.tariffs) };
+  const defaults = suggest(documented as TariffDocument).filter((p) => p.default);
+  assert.deepEqual(defaults.map((p) => [p.id, p.name]), [["standard", "Energie Erneuerbar + Netz 400ST"]]);
+  // Without an unambiguous pair there is no default.
+  assert.ok(!suggest({ ...ekzLike(), tariffs: assignIds(ekzLike().tariffs) } as TariffDocument).some((p) => p.default));
 });

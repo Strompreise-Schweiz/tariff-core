@@ -7,9 +7,10 @@ Use the own domain. It stays the same whether a utility lives in the hub repo or
 ```text
 https://data.strompreise-schweiz.ch/index.json                        every utility
 https://data.strompreise-schweiz.ch/<slug>/index.json                 all URLs of one utility
-https://data.strompreise-schweiz.ch/<slug>/tariffs/current.json
-https://data.strompreise-schweiz.ch/<slug>/prices/<id>/latest.json      day prices of one API
-https://data.strompreise-schweiz.ch/<slug>/products/<id>/latest.json    every component of a product
+https://data.strompreise-schweiz.ch/<slug>/products/<id>/<year>.json   what a customer pays in a year
+https://data.strompreise-schweiz.ch/<slug>/products/<id>/latest.json    every component of a dynamic product, today + tomorrow
+https://data.strompreise-schweiz.ch/<slug>/tariffs/current.json         all tariffs of the current year
+https://data.strompreise-schweiz.ch/<slug>/tariffs/current/<tariff>.json  day prices of a dynamic tariff, today + tomorrow
 https://data.strompreise-schweiz.ch/<slug>/checks.json
 ```
 
@@ -49,7 +50,7 @@ It publishes no number for this, and responses have no rate-limit headers. A 429
 | GitHub Pages | 100 GB per month (soft), 1 GB per site, can return 429 | Own domain possible. Not meant as hosting for a commercial service. |
 | A CDN in front of GitHub | Per CDN plan | Cached, so GitHub sees few requests |
 
-With up to about 90 KB per `latest.json` (a tariff with several components), 100 GB is roughly one million fetches a month.
+With up to about 90 KB per file of today and tomorrow (a product with several components), 100 GB is roughly one million fetches a month.
 
 ## Own domain: the only URL that stays yours
 

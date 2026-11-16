@@ -7,6 +7,7 @@ import ajvFormats from "ajv-formats";
 
 import curation from "../../schemas/curation/v1.schema.json" with { type: "json" };
 import priceDay from "../../schemas/price-day/v1.schema.json" with { type: "json" };
+import product from "../../schemas/product/v1.schema.json" with { type: "json" };
 import overallIndex from "../../schemas/overall-index/v1.schema.json" with { type: "json" };
 import sourceConfig from "../../schemas/source-config/v1.schema.json" with { type: "json" };
 import supplier from "../../schemas/supplier/v1.schema.json" with { type: "json" };
@@ -18,6 +19,7 @@ export const SCHEMAS = {
   curation,
   "price-day": priceDay,
   "overall-index": overallIndex,
+  product,
   "source-config": sourceConfig,
   supplier,
   "tariff-document": tariffDocument,

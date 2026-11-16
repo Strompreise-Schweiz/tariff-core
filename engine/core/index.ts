@@ -7,6 +7,8 @@ export { composeDay, priceAt } from "./compose.ts";
 export { applyCuration, assignIds } from "./curation.ts";
 export { excludeBrokenTariffs } from "./exclusion.ts";
 export { checkDay, correctDay, readResponse, splitByDay, toQuarterHours } from "./price-day.ts";
+export { productTotal, productYear } from "./product-year.ts";
+export { resolveProducts } from "./product-spec.ts";
 export { suggestProducts } from "./products.ts";
 export { applyWaivers, coverageProblems, documentIssues, hubIssues, priceDayIssues, schemaIssues, tariffIssues } from "./rules.ts";
 export { repairTariffFile } from "./tariff-file.ts";

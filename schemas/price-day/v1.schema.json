@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/dynamic-day/v1.schema.json",
   "title": "Day prices",
-  "description": "One Swiss calendar day in the format of HDN 2025, chapter 7.4, with an additive _meta. Used for data/prices/<id>/ (one price source of the utility) and data/products/<id>/ (every component of a product), and for their latest.json.",
+  "description": "One Swiss calendar day in the format of HDN 2025, chapter 7.4, with an additive _meta. Used for data/tariffs/<year>/<tariff>/ (the day prices of one dynamic tariff of the yearly file) and data/products/<id>/<year>/ (every component of a product), and for tariffs/current/<tariff>.json and products/<id>/latest.json (today and tomorrow).",
   "type": "object",
   "required": [
     "prices",

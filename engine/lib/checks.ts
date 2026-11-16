@@ -1,7 +1,8 @@
 /**
  * data/checks.json: everything that is wrong with the data of a utility, in one place. The files of
- * the utility against the VSE definitions, each year of the yearly file with its issues, and each
- * price source and product with its incomplete days. Also the badges for the README.
+ * the utility against the VSE definitions, each year of the yearly file with its issues, each day
+ * price API with the tariffs it serves and its incomplete days, and each product with what it lacks.
+ * Also the badges for the README.
  *
  * Written without timestamps, so a run that finds nothing new changes nothing.
  */
@@ -27,7 +28,7 @@ export interface Checks {
   vseDefinitions: Record<string, string>;
   sources: {
     tariffs: { name: string; url?: string; file?: string; sha256: string; vse: VseResults }[];
-    prices: { id: string; url: string; enabled: boolean; days: number; first: string | null; last: string | null }[];
+    days: { id: string; url: string; enabled: boolean; days: number; first: string | null; last: string | null }[];
   };
   tariffs: {
     year: number;
@@ -41,8 +42,27 @@ export interface Checks {
     excluded: ExcludedTariff[];
     vse?: VseResults;
   }[];
-  prices: { id: string; days: number; incomplete: IncompleteDay[] }[];
-  products: { id: string; year: number; days: number; incomplete: IncompleteDay[]; notes: string[] }[];
+  /** Per day price API: the dynamic tariffs it serves as <year>/<tariff>, and its days. */
+  days: {
+    id: string;
+    tariffs: string[];
+    days: number;
+    incomplete: IncompleteDay[];
+    /** Stored days of a year whose yearly file has no tariff with this API. Not published. */
+    withoutTariff: string[];
+  }[];
+  products: {
+    id: string;
+    year: number;
+    default: boolean;
+    status: string;
+    /** Slots of electricity, grid, metering and regional_fees without a tariff. */
+    missing: string[];
+    dynamic: string[];
+    days: number;
+    incomplete: IncompleteDay[];
+    notes: string[];
+  }[];
 }
 
 export function emptyChecks(utility: string, slug: string): Checks {
@@ -53,9 +73,9 @@ export function emptyChecks(utility: string, slug: string): Checks {
     slug,
     summary: { errors: 0, warnings: 0, accepted: 0, incompleteDays: 0 },
     vseDefinitions: Object.fromEntries(VSE_VERSIONS.map((version) => [version, definitionUrl(version)])),
-    sources: { tariffs: [], prices: [] },
+    sources: { tariffs: [], days: [] },
     tariffs: [],
-    prices: [],
+    days: [],
     products: [],
   };
 }
@@ -68,7 +88,7 @@ export function writeChecks(root: string, checks: Checks): void {
     errors: count("error"),
     warnings: count("warning"),
     accepted: count("accepted"),
-    incompleteDays: checks.prices.reduce((sum, source) => sum + source.incomplete.length, 0),
+    incompleteDays: checks.days.reduce((sum, source) => sum + source.incomplete.length, 0),
   };
   const writeIfChanged = (file: string, value: unknown) => {
     if (!deepEqual(readJsonIfExists(file), value)) writeJson(file, value);

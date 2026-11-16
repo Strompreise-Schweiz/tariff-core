@@ -54,19 +54,21 @@
       <thead>
         <tr>
           <th>Utility</th>
+          <th>Standard product</th>
           <th>Yearly file</th>
           <th>File of the utility vs. VSE</th>
           <th>Files of this project vs. VSE</th>
           <th>Day prices</th>
         </tr>
       </thead>
-      <tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody>
+      <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
     </table>
   </div>
   <ul class="legend">
+    <li><b>Standard product:</b> what a household in the basic supply pays without choosing anything, this year, excluding VAT: the monthly fixed prices and the price per kWh of every component together. Each component says where its choice comes from: <code>standardBasegroup</code> (marked by the utility), <code>only</code> (the only tariff of its type), <code>curated</code> (checked by a person) or <code>suggested</code> (not checked). The link opens <code>products/&lt;id&gt;/&lt;year&gt;.json</code> with each component, its options and the municipal fees.</li>
     <li><b>Yearly file:</b> per year whether it is published, and the issues the checks found. A tariff with an error of its own is left out and listed with the reason in <code>checks.json</code>. Errors of the whole file block the year, and the previous file stays online.</li>
     <li><b>VSE:</b> whether a file follows the <a href="https://github.com/Strompreise-Schweiz/tariff-core/tree/main/schemas/vse">OpenAPI definitions of the VSE</a>, version 1.0.0 and 1.0.1. Information only, it does not block publication.</li>
-    <li><b>Day prices:</b> per price source and per product the days in <code>latest.json</code> and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
+    <li><b>Day prices:</b> per dynamic tariff and per product the days of today and tomorrow and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
   </ul>
 </main>
 <script>
@@ -136,14 +138,43 @@ function vseCell(slug, checks, part) {
   return files.map(([label, vse]) => vseLine(label, vse, `/${slug}/checks.json`));
 }
 
+const rappen = (chf) => `${(chf * 100).toFixed(2)} Rp.`;
+
+async function productCell(slug, index) {
+  const year = today.slice(0, 4);
+  const product = (index?.products ?? []).find((p) => p.default.includes(Number(year)));
+  if (!product) return chip("warn", "not set", "No product is marked default in curation/<year>.json");
+  const href = `/${slug}/products/${product.id}/${year}.json`;
+  const doc = await getJson(href);
+  if (!doc) return link(href, product.name);
+  const value = (parts, unit) => (parts?.total ?? []).find((p) => p.unit === unit)?.value;
+  const perKwh = doc.total.windows.map((w) => value(w, "CHF_kWh")).filter((v) => v !== undefined);
+  const fixed = value(doc.total.fixed, "CHF_m");
+  const range = perKwh.length ? (Math.min(...perKwh) === Math.max(...perKwh) ? rappen(perKwh[0]) : `${rappen(Math.min(...perKwh))} to ${rappen(Math.max(...perKwh))}`) : null;
+  return h("div", null,
+    h("div", { class: "line" }, link(href, doc.name), " ", chip(doc.status === "verified" ? "ok" : "warn", doc.status)),
+    h("div", { class: "line" }, h("span", { class: "label" }, "per kWh"), range ?? "–",
+      doc.total.dynamic.length ? h("span", { class: "label" }, ` plus day prices of ${doc.total.dynamic.join(", ")}`) : null),
+    h("div", { class: "line" }, h("span", { class: "label" }, "per month"), fixed !== undefined ? `CHF ${fixed.toFixed(2)}` : "–"),
+    doc.municipalities.length ? h("div", { class: "line" }, h("span", { class: "label" }, `plus municipal fees of ${plural(doc.municipalities.length, "municipality").replace("municipalitys", "municipalities")}`)) : null,
+    ...Object.entries(doc.components).filter(([, c]) => c.options?.length).map(([slot, c]) =>
+      h("div", { class: "line" }, h("span", { class: "label" }, `${slot}: ${plural(c.options.length, "option")}`))),
+    h("div", { class: "line" }, ...Object.entries(doc.components).map(([slot, c]) =>
+      chip(c.basis === "suggested" ? "warn" : "ok", `${slot}: ${c.basis}`, c.basis === "suggested" ? "Not checked yet" : "Given or checked"))),
+    doc.missing.length ? h("div", { class: "line" }, chip("warn", `without ${doc.missing.join(", ")}`)) : null);
+}
+
 async function daysCell(slug, index) {
-  const entries = [...(index?.prices ?? []).map((p) => ["prices", p]), ...(index?.products ?? []).map((p) => ["products", p])];
+  const entries = [
+    ...(index?.tariffs?.days ?? []).filter((d) => d.latest).map((d) => [d.name ?? d.tariff, d.latest]),
+    ...(index?.products ?? []).filter((p) => p.days).map((p) => [`product ${p.name ?? p.id}`, p.days.latest]),
+  ];
   if (!entries.length) return chip("none", "none");
-  return Promise.all(entries.map(async ([kind, entry]) => {
-    const latest = await getJson(`/${slug}/${kind}/${entry.id}/latest.json`);
+  return Promise.all(entries.map(async ([label, url]) => {
+    const latest = await getJson(new URL(url).pathname);
     const days = latest?._meta?.days ?? [];
     const hasToday = days.some((d) => d.date === today);
-    return h("div", { class: "line" }, h("span", { class: "label" }, `${kind === "products" ? "product " : ""}${entry.name ?? entry.id}`),
+    return h("div", { class: "line" }, h("span", { class: "label" }, label),
       hasToday ? null : chip("bad", "today missing"),
       ...days.map((d) => chip(d.complete ? "ok" : "warn", `${d.date.slice(5)} ${d.complete ? "complete" : "incomplete"}`)));
   }));
@@ -154,6 +185,7 @@ async function row(utility) {
   const [checks, index] = await Promise.all([getJson(`/${slug}/checks.json`), getJson(`/${slug}/index.json`)]);
   return h("tr", null,
     h("td", null, h("a", { href: utility.repository }, utility.name), h("span", { class: "where" }, utility.maintained_in === "hub" ? "hub repo" : "own repo")),
+    h("td", null, await productCell(slug, index)),
     h("td", null, yearCell(slug, checks)),
     h("td", null, vseCell(slug, checks, "sources")),
     h("td", null, vseCell(slug, checks, "published")),
@@ -164,7 +196,7 @@ async function row(utility) {
   const body = document.getElementById("rows");
   const overall = await getJson("/index.json");
   if (!overall) {
-    body.replaceChildren(h("tr", null, h("td", { colspan: "5" }, "Could not read /index.json.")));
+    body.replaceChildren(h("tr", null, h("td", { colspan: "6" }, "Could not read /index.json.")));
     return;
   }
   const rows = await Promise.all(overall.utilities.map(row));

@@ -59,3 +59,24 @@ export function writeDayFile(file: string, document: PriceDay): void {
   const lines = prices.map((interval) => JSON.stringify(interval)).join(",\n    ");
   writeFile(file, `${JSON.stringify(head, null, 2).slice(0, -2)},\n  "prices": [\n    ${lines}\n  ]\n}\n`);
 }
+
+/**
+ * JSON for people: indented, but an array or object that fits on one short line stays on one line,
+ * such as {"unit": "CHF_kWh", "value": 0.13} or ["Mo", "Tu"]. Used for the yearly product files.
+ */
+export function readableJson(value: unknown, indent = ""): string {
+  const inline = JSON.stringify(value, null, 1)?.replace(/\n\s*/g, " ").replace(/\[ /g, "[").replace(/ \]/g, "]").replace(/\{ /g, "{").replace(/ \}/g, "}");
+  if (value === null || typeof value !== "object" || (inline !== undefined && inline.length + indent.length <= 100)) return inline ?? "null";
+  const inner = `${indent}  `;
+  if (Array.isArray(value)) {
+    if (!value.length) return "[]";
+    return `[\n${value.map((item) => inner + readableJson(item, inner)).join(",\n")}\n${indent}]`;
+  }
+  const entries = Object.entries(value).filter(([, v]) => v !== undefined);
+  if (!entries.length) return "{}";
+  return `{\n${entries.map(([key, v]) => `${inner}${JSON.stringify(key)}: ${readableJson(v, inner)}`).join(",\n")}\n${indent}}`;
+}
+
+export function writeReadableJson(file: string, value: unknown): void {
+  writeFile(file, readableJson(value));
+}

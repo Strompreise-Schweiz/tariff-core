@@ -20,12 +20,12 @@ import type { ComponentPrice, PriceInterval, Product, RegionalTax, SimplePrice, 
 const UNITS: Record<string, string> = {
   "CHF/kWh": "CHF_kWh", "CHF/M": "CHF_m", "CHF/kW/M": "CHF_kW_m", "CHF/kW/Y": "CHF_kW_y", "CHF/kW": "CHF_kW",
 };
-const SUMMED_IN_INTEGRATED = ["electricity", "grid", "regional_fees"];
-const ORDER = ["electricity", "grid", "regional_fees", "metering", "feed_in", "integrated"];
+export const SUMMED_IN_INTEGRATED = ["electricity", "grid", "regional_fees"];
+export const ORDER = ["electricity", "grid", "regional_fees", "metering", "feed_in", "integrated"];
 
-type Wall = ReturnType<typeof zurichWall>;
+export type Wall = ReturnType<typeof zurichWall>;
 /** component -> unit -> value */
-type Parts = Map<string, Map<string, number>>;
+export type Parts = Map<string, Map<string, number>>;
 
 function add(parts: Parts, component: string, unit: string, value: number): void {
   const units = parts.get(component) ?? new Map<string, number>();
@@ -62,7 +62,7 @@ function single(entries: RegionalTax[] | undefined, notes: Set<string>, what: st
 }
 
 /** What a tariff of the yearly file charges at a wall-clock time, without its day prices. */
-function yearlyParts(tariff: Tariff, wall: Wall, notes: Set<string>): Parts {
+export function yearlyParts(tariff: Tariff, wall: Wall, notes: Set<string>): Parts {
   const parts: Parts = new Map();
   const { prices } = tariff;
   const slot = tariff.tariffType;
@@ -83,12 +83,12 @@ const round = (value: number) => Number(value.toFixed(6));
 
 /**
  * Compose one day of a product. dayPrices holds the quarter hours of each dynamic tariff, by tariff
- * id, as published under data/prices/. Returns the intervals and notes on what was left out.
+ * id, as published under data/tariffs/<year>/<tariff>/. Returns the intervals and notes on what was left out.
  */
 export function composeDay(day: string, product: Product, tariffs: Map<string, Tariff>, dayPrices: Map<string, PriceInterval[]>):
   { prices: PriceInterval[]; notes: string[] } {
   const notes = new Set<string>();
-  const used = Object.values(product.components).map((id) => tariffs.get(id!)).filter((t): t is Tariff => t !== undefined);
+  const used = Object.values(product.components).map((c) => (c.tariff ? tariffs.get(c.tariff) : undefined)).filter((t): t is Tariff => t !== undefined);
   const byStart = new Map([...dayPrices].map(([id, prices]) => [id, new Map(prices.map((p) => [parseTimestamp(p.start_timestamp).ms, p]))]));
   const [start, end] = dayBounds(day);
   const prices: PriceInterval[] = [];

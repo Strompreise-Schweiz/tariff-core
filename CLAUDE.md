@@ -7,8 +7,15 @@ tariffs), or that maintain their data themselves, have their own repo. See `READ
 
 Every utility has four places: `config/source.json` (where the data comes from), `curation/<year>.json`
 (what a person changes, with reasons), `data/checks.json` (what is wrong) and `data/` (what is
-published). `fetch.ts` stores what the utility publishes unchanged in `data/sources/`; `build.ts` makes
-everything else from there and from `curation/`, offline.
+published). `fetch.ts` stores what the utility publishes unchanged in `data/sources/` (yearly file as
+`<name>.json`, day price responses in `days/<id>/`); `build.ts` makes everything else from there and
+from `curation/`, offline:
+
+- `data/tariffs/<year>.json`: all tariffs, repaired and corrected. The day prices of a dynamic tariff
+  are an addition to it, in `data/tariffs/<year>/<tariff>/<date>.json` and `tariffs/current/<tariff>.json`.
+- `data/products/<id>/<year>.json`: what a customer pays, every component and the total. One product
+  per year has `"default": true`, the standard product of a household. Products with a dynamic tariff
+  also have day files in `data/products/<id>/<year>/`.
 
 ## Repos
 

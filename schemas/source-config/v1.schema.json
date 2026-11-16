@@ -43,7 +43,7 @@
     },
     "tariffs": {
       "type": "array",
-      "description": "The yearly tariff files of the utility, in the VSE format. Stored unchanged in data/sources/tariffs/<name>.json.",
+      "description": "The yearly tariff files of the utility, in the VSE format. Stored unchanged in data/sources/<name>.json.",
       "items": {
         "type": "object",
         "required": [
@@ -87,7 +87,7 @@
     },
     "prices": {
       "type": "array",
-      "description": "The APIs with day prices (HDN 2025, chapter 7.4). Each response is stored unchanged in data/sources/prices/<id>/<year>/<date>.json.",
+      "description": "The APIs with day prices (HDN 2025, chapter 7.4). Each response is stored unchanged in data/sources/days/<id>/<year>/<date>.json and published under each dynamic tariff of the yearly file whose prices.dynamic.url is this API: data/tariffs/<year>/<tariff>/<date>.json.",
       "items": {
         "type": "object",
         "required": [
@@ -100,7 +100,7 @@
           "id": {
             "type": "string",
             "pattern": "^[a-z0-9-]+$",
-            "description": "Stable name, part of the URL data/prices/<id>/."
+            "description": "Stable name, part of the folder data/sources/days/<id>/ and of corrections in curation."
           },
           "name": {
             "type": "string"

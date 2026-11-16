@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Strompreise-Schweiz/tariff-core/main/schemas/product/v1.schema.json",
+  "title": "Product of one year (data/products/<id>/<year>.json)",
+  "description": "What a customer pays in a year: every component as the tariff of the yearly file, and their total. Prices exclude VAT. A product with a dynamic component also has day files with every component per quarter hour, see _meta.days.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "year",
+    "status",
+    "default",
+    "dsoName",
+    "dsoNumber",
+    "pricesExcludeVat",
+    "total",
+    "missing",
+    "municipalities",
+    "components",
+    "_meta"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "year": {
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "suggested",
+        "verified"
+      ],
+      "description": "verified: a person checked it against the utility's price sheet."
+    },
+    "default": {
+      "type": "boolean",
+      "description": "The standard product of a household in the basic supply: what it gets without choosing anything."
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "kind",
+        "value"
+      ],
+      "description": "Set when a customer must belong to a group to use this product, such as an EKZ grid cluster."
+    },
+    "note": {
+      "type": "string"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "dsoName": {
+      "type": "string"
+    },
+    "dsoNumber": {
+      "type": "integer"
+    },
+    "pricesExcludeVat": {
+      "const": true
+    },
+    "total": {
+      "type": "object",
+      "required": [
+        "fixed",
+        "windows",
+        "dynamic"
+      ],
+      "properties": {
+        "fixed": {
+          "$ref": "#/$defs/Parts",
+          "description": "Monthly prices (CHF_m) of each component, and their sum in total."
+        },
+        "windows": {
+          "type": "array",
+          "description": "Prices that depend on the time, in Swiss wall-clock windows as in VSE 1.0.1: the day ends at 23:59, a window across midnight is split. Each window has the prices of each component and their sum in total. Without the day prices of the dynamic components.",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/Prices"
+            },
+            "required": [
+              "months",
+              "weekdays",
+              "from",
+              "to",
+              "total"
+            ],
+            "properties": {
+              "months": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "Jan",
+                    "Feb",
+                    "Mar",
+                    "Apr",
+                    "May",
+                    "Jun",
+                    "Jul",
+                    "Aug",
+                    "Sep",
+                    "Oct",
+                    "Nov",
+                    "Dec"
+                  ]
+                }
+              },
+              "weekdays": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "Mo",
+                    "Tu",
+                    "We",
+                    "Th",
+                    "Fr",
+                    "Sa",
+                    "Su"
+                  ]
+                }
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^\\d{2}:\\d{2}$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^\\d{2}:\\d{2}$"
+              }
+            }
+          }
+        },
+        "dynamic": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "electricity",
+              "grid",
+              "metering",
+              "regional_fees"
+            ]
+          },
+          "description": "Components whose price per kWh changes every day."
+        }
+      }
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "electricity",
+          "grid",
+          "metering",
+          "regional_fees"
+        ]
+      },
+      "description": "Components without a tariff. The total does not include them."
+    },
+    "municipalities": {
+      "type": "array",
+      "description": "The municipal fees of each municipality, by BFS number. Not in the total: add those of your municipality.",
+      "items": {
+        "type": "object",
+        "required": [
+          "number",
+          "name",
+          "tariffs",
+          "fixed"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tariffs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fixed": {
+            "$ref": "#/$defs/Prices"
+          },
+          "energy": {
+            "$ref": "#/$defs/Prices"
+          },
+          "windows": {
+            "type": "array"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The components of the product: the tariff in the total as in tariffs/<year>.json, where the choice comes from, and the options.",
+      "properties": {
+        "electricity": {
+          "$ref": "#/$defs/Component"
+        },
+        "grid": {
+          "$ref": "#/$defs/Component"
+        },
+        "metering": {
+          "$ref": "#/$defs/Component"
+        },
+        "regional_fees": {
+          "$ref": "#/$defs/Component"
+        }
+      }
+    },
+    "_meta": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "vseVersion",
+        "generator",
+        "tariffs",
+        "days",
+        "notes"
+      ],
+      "properties": {
+        "tariffs": {
+          "type": "string",
+          "description": "The yearly file the components come from."
+        },
+        "days": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "latest",
+            "archive"
+          ],
+          "description": "The day files of a product with a dynamic component."
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What the total leaves out, such as regional fees that depend on the municipality."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "Parts": {
+      "type": "object",
+      "description": "Component name, such as grid, and its prices in the units of HDN 7.4 (CHF_kWh, CHF_m, CHF_kW_m).",
+      "additionalProperties": {
+        "$ref": "#/$defs/Prices"
+      }
+    },
+    "Prices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "unit",
+          "value"
+        ],
+        "properties": {
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "Component": {
+      "type": "object",
+      "required": [
+        "basis"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "standardBasegroup",
+            "only",
+            "curated",
+            "suggested"
+          ]
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "tariff": {
+          "type": "object"
+        },
+        "howToFind": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "tariffName",
+              "fixed"
+            ]
+          }
+        },
+        "byMunicipality": {}
+      }
+    }
+  }
+}

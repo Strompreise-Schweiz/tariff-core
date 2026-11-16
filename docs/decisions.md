@@ -15,19 +15,72 @@ changes (`curation/<year>.json`), what is wrong (`data/checks.json`) and what is
 from there and from `curation/`, offline. So a published file can always be traced back to a stored
 source plus a correction with a reason, and a new correction also applies to days already published.
 There is no "static" and "dynamic" pipeline any more: the VSE forms `constant`, `multilevel` and
-`dynamic` all live in the yearly file, and only the prices of `dynamic` come from an API. The two
-formats are named after what they hold: `tariffs` (the yearly file) and `prices` (the day prices).
+`dynamic` all live in the yearly file, and only the prices of `dynamic` come from an API.
 
 The previous layout of version 3 (`data/static/raw/`, `data/dynamic/<id>/{raw,vse,normalized}/`,
 `status.json`, `vse-conformance.json`, `<year>.report.json`) was replaced without compatibility, at the
 start of the project. The UTC copy `normalized/` was dropped: it held nothing the day files do not.
 
-## The yearly file points to the day prices of this project
+## Day prices are an addition to the yearly file
 
-The yearly file of a utility has `prices.dynamic.url` pointing to its own API. The published file points
-to `data/prices/<id>/latest.json` instead, and keeps the URL of the utility in `sourceUrl`. The day
-files have no query parameters: GitHub Pages serves files and ignores a query string. A consumer who
-needs a past day takes `<year>/<date>.json`.
+Until November 2026 the day prices were a format of their own, `data/prices/<id>/`, named after the
+API. But a dynamic tariff is a tariff of the yearly file, with its base price and everything else, and
+the day prices are only the values the yearly file cannot hold. So they now sit next to the yearly
+file of their year, under the id of the tariff:
+
+```text
+data/sources/<name>.json                   the yearly file of the utility
+data/sources/days/<id>/<year>/<date>.json  what the API of the utility sent, by API
+
+data/tariffs/2026.json                     all tariffs of 2026, corrected
+data/tariffs/2026/<tariff>/<date>.json     the days of the dynamic tariff <tariff> in 2026.json
+data/tariffs/current/<tariff>.json         today and tomorrow
+```
+
+The stored responses stay named after the API, because `fetch.ts` only downloads and does not know
+the tariff ids, which `build.ts` makes from the yearly file. `build.ts` links the two through
+`prices.dynamic.url`. If several tariffs of a year use one API, each gets the days. A day of a year
+whose yearly file has no tariff with that API is not published: it stays in `data/sources/` and
+`checks.json` lists it under `withoutTariff`. An API that is no tariff of its own, such as the EKZ sum
+`integrated_400D`, is stored but not published; the products compute `integrated` themselves.
+
+The published tariff points `prices.dynamic.url` to `tariffs/current/<tariff>.json` and keeps the URL
+of the utility in `sourceUrl`. The day files have no query parameters: GitHub Pages serves files and
+ignores a query string. A consumer who needs a past day takes `<year>/<tariff>/<date>.json`.
+
+The change was made without compatibility, because nothing was in production. The EKZ archive
+`legacy-default` (August to November 2026, fetched without `tariff_name`, so not a dynamic tariff) was
+deleted with it. From now on, stored responses are not deleted.
+
+## Products are what a customer pays
+
+The VSE format lists tariffs, but nobody pays a single tariff: a household pays energy, grid,
+metering and fees together. A price sheet shows this per product, and the published data has to as
+well, or every visitor has to assemble it. So every product has a yearly file
+`data/products/<id>/<year>.json` with the tariffs it is made of and their sum: the monthly prices in
+`total.fixed` and the prices per kWh in `total.windows`, in one set of time windows for all
+components. A product with a dynamic tariff also has its day files.
+
+One product per year is marked `default`: what a household in the basic supply gets without
+choosing anything. It is the first thing a visitor needs, so the index and the status page start
+with it. VSE 1.0.1 has `standardBasegroup` for one electricity and one grid tariff, and
+`suggest-products.ts` proposes that pair as the product `standard`. 
+## Each component says where its choice comes from
+
+VSE 1.0.1 marks the standard tariff only for electricity and grid (`standardBasegroup`), and says it
+should be false for metering and regional fees. It has no products and no selection for end customers.
+So a product cannot be "given" or "suggested" as a whole: energy and grid of the standard product come
+from the utility, metering and fees are a choice. Every component therefore has a `basis`:
+`standardBasegroup`, `only` (the only tariff of its type at the voltage level), `curated` (checked by a
+person, with `sourceUrl`) or `suggested`. The product is `verified` when no component is `suggested`.
+
+Most utilities have more than one metering tariff and more than one fee. A household usually has one
+of them: direct metering at network level 7, and the fees of its municipality. So the product keeps
+one tariff in the total and lists the others as `options`, each with its prices. Municipal fees are
+listed per municipality by the BFS number that VSE uses in `municipalityTaxes`, and not added to the
+total, because the product does not know where the customer lives. A fee for everybody, such as a
+cantonal one, stays in the total. A small utility with one metering tariff and no municipal fees
+needs none of this: its components are `only`.
 
 ## A product day holds every component, per quarter hour
 
@@ -140,7 +193,7 @@ The VSE format uses Swiss local time. That is fine, because with an offset every
 exactly one instant: `2026-10-25T02:30:00+02:00` and `2026-10-25T02:30:00+01:00` are one hour apart.
 It also fits how the data is used: tariff days, invoices and price sheets follow the Swiss calendar.
 
-- Day prices: Swiss local time with mandatory offset (`prices/`, `products/`, `latest.json`).
+- Day prices: Swiss local time with mandatory offset (`tariffs/<year>/`, `tariffs/current/`, `products/`).
 - Time windows of the yearly file such as "07:00 to 20:00": wall-clock time without offset. High tariff starts at 07:00
   in summer and winter. Converting these to UTC would be wrong.
 
@@ -166,8 +219,8 @@ The old fetcher called the API without parameters and took whatever came back. T
 
 - A run delayed past midnight lost a day. All five missing EKZ days (2026-08-27 to 2026-10-12) match
   BKW runs after midnight on the following date.
-- EKZ answered with its standard tariff and today's date. The archive up to November 2026 therefore
-  holds one price per day and not the dynamic tariff.
+- EKZ answered with its standard tariff and today's date. That archive held one price per day and not
+  the dynamic tariff, and was deleted in November 2026.
 
 The fetcher now names `tariff_name` and the day, and looks back three days to close gaps.
 

@@ -183,7 +183,7 @@
     "products": {
       "type": "array",
       "items": {
-        "$ref": "../tariff-document/v1.schema.json#/$defs/Product"
+        "$ref": "#/$defs/CuratedProduct"
       }
     },
     "acceptIssues": {
@@ -206,6 +206,130 @@
             "type": "string",
             "minLength": 1
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "CuratedProduct": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "components"
+      ],
+      "description": "A product. A component is a tariff id, or an object as in the yearly file whose basis is derived when absent: standardBasegroup, only, or suggested. status verified: a person checked every other component, which then becomes curated and needs sourceUrl.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "suggested",
+            "verified"
+          ]
+        },
+        "default": {
+          "type": "boolean",
+          "description": "The standard product of a household in the basic supply: what it gets without choosing anything. At most one per year."
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "note": {
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "../tariff-document/v1.schema.json#/$defs/Product/properties/selection"
+        },
+        "components": {
+          "type": "object",
+          "required": [
+            "electricity",
+            "grid"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "electricity": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/CuratedComponent"
+                }
+              ]
+            },
+            "grid": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/CuratedComponent"
+                }
+              ]
+            },
+            "metering": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/CuratedComponent"
+                }
+              ]
+            },
+            "regional_fees": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/CuratedComponent"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "CuratedComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tariff": {
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "standardBasegroup",
+            "only",
+            "curated",
+            "suggested"
+          ]
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "howToFind": {
+          "type": "string"
+        },
+        "byMunicipality": {
+          "$ref": "../tariff-document/v1.schema.json#/$defs/ProductComponent/properties/byMunicipality"
         }
       }
     }

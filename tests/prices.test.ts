@@ -4,13 +4,14 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { checkDay, readResponse, splitByDay, toQuarterHours, type ApiResponse } from "../engine/core/price-day.ts";
-import { priceDayIssues } from "../engine/core/rules.ts";
+import { productTotal } from "../engine/core/product-year.ts";
+import { priceDayIssues, schemaIssues } from "../engine/core/rules.ts";
 import { dayBounds, formatTimestamp, formatUtcZ, inUtc, inZurich, parseTimestamp } from "../engine/core/time.ts";
-import type { PriceDay } from "../engine/core/types.ts";
+import type { PriceDay, Tariff } from "../engine/core/types.ts";
 import { build } from "../engine/build.ts";
 import { main as fetchMain } from "../engine/fetch.ts";
 import { http, HttpError } from "../engine/lib/http.ts";
-import { ekzLike, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
+import { ekzLike, price, readJsonFile, setNow, tempDir, writeJsonFile, type Obj } from "./helpers.ts";
 
 const read = (raw: Obj, source: Obj = {}) => readResponse(raw as ApiResponse, source);
 
@@ -55,8 +56,10 @@ function serve(responses: Record<string, Obj>): void {
 }
 
 const fetchPrices = (root: string) => fetchMain(["--prices"], root);
-const stored = (root: string, day: string) => path.join(root, "data/sources/prices/grid-d", day.slice(0, 4), `${day}.json`);
-const published = (root: string, day: string) => path.join(root, "data/prices/grid-d", day.slice(0, 4), `${day}.json`);
+const stored = (root: string, day: string) => path.join(root, "data/sources/days/grid-d", day.slice(0, 4), `${day}.json`);
+// The dynamic grid tariff of the yearly file of productRepo uses the price source grid-d.
+const GRID = "grid-netz-400d-ne7";
+const published = (root: string, day: string) => path.join(root, "data/tariffs", day.slice(0, 4), GRID, `${day}.json`);
 
 // ---------------------------------------------------------------------------------------------
 // Reading and checking a day
@@ -131,22 +134,24 @@ test("hourly values become four quarter hours", () => {
 // ---------------------------------------------------------------------------------------------
 // Fetching
 
-test("a fetch stores the responses unchanged, and the build publishes them", async () => {
-  const root = orgRepo();
+test("a fetch stores the responses unchanged, and the build publishes them under the tariff", async () => {
+  const root = productRepo();
   setNow("2026-07-01T17:00:00Z");
   const day = makeDay("2026-07-02");
   serve({ "2026-07-01": makeDay("2026-07-01"), "2026-07-02": day });
   assert.equal(await fetchPrices(root), 0);
   assert.equal(readFileSync(stored(root, "2026-07-02"), "utf8").trim(), JSON.stringify(day));
-  assert.ok(!existsSync(path.join(root, "data/prices")), "fetch writes only data/sources");
+  assert.ok(!existsSync(path.join(root, "data/tariffs")), "fetch writes only data/sources");
   assert.equal(build(root), 0);
-  const latest = readJsonFile(path.join(root, "data/prices/grid-d/latest.json"));
+  const latest = readJsonFile(path.join(root, `data/tariffs/current/${GRID}.json`));
   assert.equal(latest.prices.length, 192);
   assert.equal(latest._meta.valid_to, "2026-07-03T00:00:00+02:00");
   assert.deepEqual(priceDayIssues("latest.json", latest as PriceDay), []);
   const doc = readJsonFile(published(root, "2026-07-02"));
   assert.deepEqual(priceDayIssues("2026-07-02.json", doc as PriceDay), []);
-  assert.equal(doc._meta.source.file, "sources/prices/grid-d/2026/2026-07-02.json");
+  assert.equal(doc._meta.source.file, "sources/days/grid-d/2026/2026-07-02.json");
+  assert.equal(doc._meta.tariff, GRID);
+  assert.equal(doc._meta.tariffs, "tariffs/2026.json");
 });
 
 test("a late run after midnight loses no day", async () => {
@@ -225,11 +230,11 @@ test("a source starts on its first day and stops after its last", async () => {
   serve({ "2027-01-01": makeDay("2027-01-01") });
   setNow("2026-12-30T20:00:00Z");
   assert.equal(await fetchPrices(root), 0);
-  assert.ok(!existsSync(path.join(root, "data/sources/prices/grid-d")));
+  assert.ok(!existsSync(path.join(root, "data/sources/days/grid-d")));
   setNow("2026-12-31T20:30:00Z");
   assert.equal(await fetchPrices(root), 0);
   assert.ok(existsSync(stored(root, "2027-01-01")));
-  assert.ok(!existsSync(path.join(root, "data/sources/prices/grid-d/2026")));
+  assert.ok(!existsSync(path.join(root, "data/sources/days/grid-d/2026")));
   setNow("2028-01-02T20:30:00Z");
   assert.equal(await fetchPrices(root), 0);
 });
@@ -238,7 +243,7 @@ test("a source starts on its first day and stops after its last", async () => {
 // Building: corrections and products
 
 test("a correction from curation replaces a component and is recorded", () => {
-  const root = orgRepo();
+  const root = productRepo();
   setNow("2026-07-02T10:00:00Z");
   writeJsonFile(stored(root, "2026-07-02"), makeDay("2026-07-02"));
   writeJsonFile(path.join(root, "curation/2026.json"), {
@@ -284,7 +289,7 @@ test("a dynamic tariff points to the day prices of this project", () => {
   setNow("2026-07-02T10:00:00Z");
   assert.equal(build(root), 0);
   const grid = readJsonFile(path.join(root, "data/tariffs/2026.json")).tariffs.find((t: Obj) => t.id === "grid-netz-400d-ne7");
-  assert.deepEqual(grid.prices.dynamic, { url: "https://data.strompreise-schweiz.ch/muster/prices/grid-d/latest.json", sourceUrl: SOURCE_URL });
+  assert.deepEqual(grid.prices.dynamic, { url: `https://data.strompreise-schweiz.ch/muster/tariffs/current/${GRID}.json`, sourceUrl: SOURCE_URL });
   // The dynamic electricity tariff has no price source: it keeps its url and is reported.
   const checks = readJsonFile(path.join(root, "data/checks.json"));
   assert.ok(checks.tariffs[0].issues.some((i: Obj) => i.code === "dynamic_without_prices" && i.tariff === "electricity-energie-dynamisch-ne7"));
@@ -329,12 +334,126 @@ test("a day whose stored response is deleted disappears from prices and products
 });
 
 test("checks.json lists incomplete days", () => {
-  const root = orgRepo();
+  const root = productRepo();
   setNow("2026-11-14T10:00:00Z");
   writeJsonFile(stored(root, "2026-11-14"), makeDay("2026-11-14", { withoutKwh: true }));
   build(root);
   const checks = readJsonFile(path.join(root, "data/checks.json"));
-  assert.deepEqual(checks.prices, [{ id: "grid-d", days: 1, incomplete: [{ date: "2026-11-14", issues: ["96 of 96 intervals have no price per kWh"] }] }]);
+  assert.deepEqual(checks.days, [{
+    id: "grid-d", tariffs: [`2026/${GRID}`], days: 1,
+    incomplete: [{ date: "2026-11-14", issues: ["96 of 96 intervals have no price per kWh"] }], withoutTariff: [],
+  }]);
   assert.equal(checks.summary.incompleteDays, 1);
   assert.equal(readJsonFile(published(root, "2026-11-14"))._meta.complete, false);
+});
+
+test("a day of a year without a tariff for its API stays in the sources", () => {
+  const root = productRepo();
+  setNow("2025-12-31T10:00:00Z");
+  writeJsonFile(stored(root, "2025-12-31"), makeDay("2025-12-31"));
+  writeJsonFile(stored(root, "2026-07-02"), makeDay("2026-07-02"));
+  assert.equal(build(root), 0);
+  assert.ok(!existsSync(path.join(root, "data/tariffs/2025")));
+  assert.ok(existsSync(published(root, "2026-07-02")));
+  const checks = readJsonFile(path.join(root, "data/checks.json"));
+  assert.deepEqual(checks.days[0].withoutTariff, ["2025-12-31"]);
+});
+
+test("a product year has every component and the total per window", () => {
+  const root = productRepo();
+  setNow("2026-07-02T10:00:00Z");
+  writeJsonFile(path.join(root, "curation/2026.json"), {
+    year: 2026,
+    products: [{
+      id: "erneuerbar-400st", name: "Energie Erneuerbar + Netz 400ST", status: "suggested", default: true,
+      components: { electricity: "electricity-energie-erneuerbar-ne7", grid: "grid-netz-400st-ne7", metering: "metering-messung-ne7" },
+    }],
+  });
+  assert.equal(build(root), 0);
+  const doc = readJsonFile(path.join(root, "data/products/erneuerbar-400st/2026.json"));
+  assert.deepEqual(schemaIssues(doc, "product"), []);
+  assert.equal(doc.default, true);
+  assert.deepEqual(doc.missing, ["regional_fees"]);
+  assert.deepEqual(Object.keys(doc.components), ["electricity", "grid", "metering"]);
+  assert.deepEqual(doc.total.fixed, {
+    electricity: [{ unit: "CHF_m", value: 3 }], grid: [{ unit: "CHF_m", value: 0 }], metering: [{ unit: "CHF_m", value: 5 }],
+    total: [{ unit: "CHF_m", value: 8 }],
+  });
+  // Winter and summer of the electricity tariff, plus the constant grid price, over the whole day.
+  assert.deepEqual(doc.total.windows, [
+    { months: ["Jan", "Feb", "Mar", "Oct", "Nov", "Dec"], weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"], from: "00:00", to: "23:59",
+      electricity: [{ unit: "CHF_kWh", value: 0.13 }], grid: [{ unit: "CHF_kWh", value: 0.1 }], total: [{ unit: "CHF_kWh", value: 0.23 }] },
+    { months: ["Apr", "May", "Jun", "Jul", "Aug", "Sep"], weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"], from: "00:00", to: "23:59",
+      electricity: [{ unit: "CHF_kWh", value: 0.09 }], grid: [{ unit: "CHF_kWh", value: 0.1 }], total: [{ unit: "CHF_kWh", value: 0.19 }] },
+  ]);
+  assert.deepEqual(doc.total.dynamic, []);
+  assert.equal(doc._meta.days, null);
+  const index = readJsonFile(path.join(root, "data/index.json"));
+  assert.deepEqual(index.products[0].default, [2026]);
+  const checks = readJsonFile(path.join(root, "data/checks.json"));
+  assert.ok(!checks.tariffs[0].issues.some((i: Obj) => i.code === "no_default_product"));
+});
+
+test("windows of several components are cut into one set", () => {
+  const tariff = (type: string, energy: Obj[]) => ({ id: type, tariffType: type, tariffForm: "multilevel", prices: { energy } }) as unknown as Tariff;
+  const { total } = productTotal([
+    tariff("electricity", [
+      { months: [], weekdays: ["Mo", "Tu", "We", "Th", "Fr"], from: "07:00", to: "20:00", price: 0.2, priceUnit: "CHF/kWh" },
+      { months: [], weekdays: ["Mo", "Tu", "We", "Th", "Fr"], from: "20:00", to: "07:00", price: 0.1, priceUnit: "CHF/kWh" },
+      { months: [], weekdays: ["Sa", "Su"], from: "00:00", to: "23:59", price: 0.1, priceUnit: "CHF/kWh" },
+    ]),
+    tariff("grid", [
+      { months: [], weekdays: [], from: "06:00", to: "22:00", price: 0.12, priceUnit: "CHF/kWh" },
+      { months: [], weekdays: [], from: "22:00", to: "06:00", price: 0.08, priceUnit: "CHF/kWh" },
+    ]),
+  ]);
+  const weekday = total.windows.filter((w) => (w.weekdays as string[]).includes("Mo"));
+  assert.deepEqual(weekday.map((w) => [w.from, w.to, (w.total as Obj[])[0].value]), [
+    ["00:00", "06:00", 0.18], ["06:00", "07:00", 0.22], ["07:00", "20:00", 0.32], ["20:00", "22:00", 0.22], ["22:00", "23:59", 0.18],
+  ]);
+  assert.deepEqual(total.windows.filter((w) => (w.weekdays as string[]).includes("Sa")).map((w) => [w.weekdays, w.from, w.to]), [
+    [["Sa", "Su"], "00:00", "06:00"], [["Sa", "Su"], "06:00", "22:00"], [["Sa", "Su"], "22:00", "23:59"],
+  ]);
+});
+
+test("two default products in a year are an error, none is a warning", () => {
+  const root = productRepo();
+  setNow("2026-07-02T10:00:00Z");
+  build(root);
+  let checks = readJsonFile(path.join(root, "data/checks.json"));
+  assert.ok(checks.tariffs[0].issues.some((i: Obj) => i.code === "no_default_product" && i.severity === "warning"));
+  writeJsonFile(path.join(root, "curation/2026.json"), { year: 2026, products: [{ ...PRODUCT, default: true }, { ...PRODUCT, id: "zwei", default: true }] });
+  assert.ok(build(root) > 0);
+  checks = readJsonFile(path.join(root, "data/checks.json"));
+  assert.ok(checks.tariffs[0].issues.some((i: Obj) => i.code === "several_default_products"));
+});
+
+test("metering options and municipal fees are listed next to the total", () => {
+  const root = productRepo();
+  setNow("2026-07-02T10:00:00Z");
+  const source = ekzLike();
+  source.tariffs.push({ ...structuredClone(source.tariffs[5]), tariffName: "Messung Wandler", prices: { base: { price: 25, priceUnit: "CHF/M" } } });
+  source.tariffs.push({ ...structuredClone(source.tariffs[6]), tariffName: "Gemeindeabgabe", prices: {
+    municipalityTaxes: [{ municipalityNumber: 261, municipalityName: "Zürich", municipalityEnergy: [price(0.012)], municipalityComment: "Cap 24 CHF a year" }] } });
+  writeJsonFile(path.join(root, "curation/2026.source.json"), source);
+  writeJsonFile(path.join(root, "curation/2026.json"), { year: 2026, products: [{
+    id: "standard", name: "Standard", default: true, components: {
+      electricity: "electricity-energie-erneuerbar-ne7", grid: "grid-netz-400st-ne7",
+      metering: { tariff: "metering-messung-ne7", options: ["metering-messung-wandler-ne7"], howToFind: "On the meter" },
+      regional_fees: { tariff: "regional-fees-abgaben-ne7", byMunicipality: { tariffNames: ["Gemeindeabgabe", "Abgaben"] } },
+    },
+  }] });
+  assert.equal(build(root), 0);
+  const doc = readJsonFile(path.join(root, "data/products/standard/2026.json"));
+  assert.deepEqual(schemaIssues(doc, "product"), []);
+  assert.deepEqual(doc.components.metering.options, [{ id: "metering-messung-wandler-ne7", tariffName: "Messung Wandler", comment: "ohne MwSt.",
+    fixed: [{ unit: "CHF_m", value: 25 }] }]);
+  assert.equal(doc.components.metering.basis, "suggested");
+  assert.equal(doc.status, "suggested");
+  // The fee tariff in the total has Menzingen too: it is listed with the municipalities, not summed twice.
+  assert.deepEqual(doc.municipalities.map((m: Obj) => [m.number, m.name, m.energy[0].value, m.comments ?? []]), [
+    [12389, "Menzingen", 0.0049, []],
+    [261, "Zürich", 0.012, ["Cap 24 CHF a year"]],
+  ]);
+  assert.ok(doc._meta.notes.some((n: string) => n.startsWith("the total is without municipal fees")));
 });

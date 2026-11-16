@@ -131,16 +131,16 @@ test("the site of an org repo serves the day files of the current year only", ()
   setNow("2027-01-05T10:00:00Z");
   const root = tempDir();
   writeJsonFile(path.join(root, "config/source.json"), { slug: "ekz", name: "EKZ", prices: [], tariffs: [] });
-  for (const relative of ["prices/grid-d/2026/2026-12-31.json", "prices/grid-d/2027/2027-01-05.json",
-    "sources/prices/grid-d/2026/2026-12-31.json", "products/p/2026/2026-08-25.json",
-    "prices/grid-d/latest.json", "tariffs/2026.json", "index.json"]) {
+  for (const relative of ["tariffs/2026/grid-d/2026-12-31.json", "tariffs/2027/grid-d/2027-01-05.json",
+    "sources/days/grid-d/2026/2026-12-31.json", "products/p/2026/2026-08-25.json", "products/p/2026.json",
+    "tariffs/current/grid-d.json", "tariffs/2026.json", "index.json"]) {
     writeJsonFile(path.join(root, "data", relative), {});
   }
   assert.equal(buildSite(root, path.join(root, "_site")), 0);
   const site = path.join(root, "_site");
   const served = readdirSync(site, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile()).map((e) => path.relative(site, path.join(e.parentPath, e.name))).sort();
-  assert.deepEqual(served, ["index.json", "prices/grid-d/2027/2027-01-05.json", "prices/grid-d/latest.json", "tariffs/2026.json"]);
+  assert.deepEqual(served, ["index.json", "products/p/2026.json", "tariffs/2026.json", "tariffs/2027/grid-d/2027-01-05.json", "tariffs/current/grid-d.json"]);
 });
 
 test("the hub site has the status page, and each utility a checks.json", () => {

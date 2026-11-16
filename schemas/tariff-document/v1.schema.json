@@ -226,7 +226,7 @@
             "url": {
               "type": "string",
               "format": "uri",
-              "description": "The day prices of this tariff as published by this project, data/prices/<id>/latest.json. The URL of the utility if no price source is configured for it."
+              "description": "The day prices of this tariff as published by this project, tariffs/current/<id>.json. The URL of the utility if no price source is configured for it."
             },
             "sourceUrl": {
               "type": "string",
@@ -446,7 +446,11 @@
             "suggested",
             "verified"
           ],
-          "description": "verified: a person checked it against the utility's price sheet."
+          "description": "verified when no component is suggested: each comes from standardBasegroup, is the only tariff of its type, or was checked by a person against sourceUrl."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "The standard product of a household in the basic supply: what it gets without choosing anything. At most one per year."
         },
         "sourceUrl": {
           "type": "string",
@@ -464,16 +468,16 @@
           "additionalProperties": false,
           "properties": {
             "electricity": {
-              "type": "string"
+              "$ref": "#/$defs/ProductComponent"
             },
             "grid": {
-              "type": "string"
+              "$ref": "#/$defs/ProductComponent"
             },
             "metering": {
-              "type": "string"
+              "$ref": "#/$defs/ProductComponent"
             },
             "regional_fees": {
-              "type": "string"
+              "$ref": "#/$defs/ProductComponent"
             }
           }
         },
@@ -495,6 +499,64 @@
               "type": "string"
             }
           }
+        }
+      }
+    },
+    "ProductComponent": {
+      "type": "object",
+      "required": [
+        "basis"
+      ],
+      "additionalProperties": false,
+      "description": "One component of a product: the tariff in the total, where the choice comes from, and the options a customer may have instead.",
+      "properties": {
+        "tariff": {
+          "type": "string",
+          "description": "Id of the tariff in the total. Absent only for regional fees listed per municipality."
+        },
+        "basis": {
+          "enum": [
+            "standardBasegroup",
+            "only",
+            "curated",
+            "suggested"
+          ],
+          "description": "standardBasegroup: the utility marks the tariff as standard (VSE 1.0.1). only: the yearly file has one tariff of this type for the voltage level. curated: a person chose it, see sourceUrl. suggested: not checked."
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Other tariffs of the same type a customer may have instead."
+        },
+        "howToFind": {
+          "type": "string",
+          "description": "How a customer finds out which option applies."
+        },
+        "byMunicipality": {
+          "description": "regional_fees only: list the municipal fees of every municipality. An object limits them to tariffs with these names.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tariffNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     }

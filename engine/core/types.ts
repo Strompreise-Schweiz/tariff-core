@@ -42,7 +42,7 @@ export interface Prices extends Open {
   power?: TimePrice[];
   reactivePower?: TimePrice[];
   refundStorage?: SimplePrice;
-  /** url: the published day prices of this project. sourceUrl: the API of the utility. */
+  /** url: the day prices of this project, tariffs/current/<id>.json. sourceUrl: the API of the utility. */
   dynamic?: { url: string; sourceUrl?: string };
   municipalityTaxes?: RegionalTax[];
   cantonalTaxes?: RegionalTax[];
@@ -65,14 +65,64 @@ export interface Tariff extends Open {
   prices: Prices;
 }
 
+/**
+ * Where the choice of a component comes from:
+ * - standardBasegroup: the utility marks the tariff as standard (VSE 1.0.1, electricity and grid only)
+ * - only: the yearly file has one tariff of this type for the voltage level
+ * - curated: a person chose it and checked it against a source (sourceUrl)
+ * - suggested: proposed, not checked
+ */
+export type Basis = "standardBasegroup" | "only" | "curated" | "suggested";
+
+/** Selects tariffs of the yearly file by name, such as the concession fees of every municipality. */
+export interface MunicipalitySelection {
+  tariffNames?: string[];
+}
+
+/** One component of a product, as published in tariffs/<year>.json. */
+export interface ProductComponent {
+  /** The tariff in the total. Absent for regional fees that exist per municipality only. */
+  tariff?: string;
+  basis: Basis;
+  sourceUrl?: string;
+  /** Other tariffs of the same type a customer may have instead, such as transformer metering. */
+  options?: string[];
+  /** How a customer finds out which option applies. */
+  howToFind?: string;
+  /** regional_fees only: list the municipal fees of every municipality, by BFS number. */
+  byMunicipality?: boolean | MunicipalitySelection;
+}
+
 export interface Product extends Open {
   id: string;
   name: string;
+  /** verified when no component is suggested. */
   status: "suggested" | "verified";
+  /**
+   * The standard product of a household in the basic supply: what it gets without choosing
+   * anything. At most one per year.
+   */
+  default?: boolean;
   sourceUrl?: string;
   note?: string;
-  components: Partial<Record<TariffType, string>>;
+  components: Partial<Record<TariffType, ProductComponent>>;
   selection?: { kind: string; value: string; howToFind?: string };
+}
+
+/**
+ * A product as written in curation/<year>.json. A component is a tariff id, or an object whose
+ * basis is derived when absent. status "verified" means a person checked every component that is
+ * not standard or the only one: those become curated.
+ */
+export interface CuratedProduct extends Open {
+  id: string;
+  name: string;
+  status?: Product["status"];
+  default?: boolean;
+  sourceUrl?: string;
+  note?: string;
+  selection?: Product["selection"];
+  components: Partial<Record<TariffType, string | (Omit<ProductComponent, "basis"> & { basis?: Basis })>>;
 }
 
 export interface Repair {
@@ -145,7 +195,7 @@ export interface Curation {
   removeTariffs?: { match: TariffMatch; reason: string }[];
   addTariffs?: { tariff: Tariff; reason: string; sourceUrl?: string }[];
   prices?: PriceCorrection[];
-  products?: Product[];
+  products?: CuratedProduct[];
   acceptIssues?: Waiver[];
 }
 
@@ -219,10 +269,88 @@ export interface DayCheck {
   day_length_hours: number;
 }
 
-/** data/prices/<id>/... and data/products/<id>/...: HDN format with _meta. */
+/** data/tariffs/<year>/<id>/..., tariffs/current/ and data/products/<id>/<year>/...: HDN format with _meta. */
 export interface PriceDay {
   $schema?: string;
   publication_timestamp: string | null;
   _meta: { complete: boolean; [key: string]: unknown };
   prices: PriceInterval[];
+}
+
+/** A component of a product year: the tariff in the total, and the options. */
+export interface ProductYearComponent {
+  basis: Basis;
+  sourceUrl?: string;
+  tariff?: Tariff;
+  howToFind?: string;
+  /** Each option alone: its monthly prices, and its prices per kWh as one price or per window. */
+  options?: { id: string; tariffName: string; comment?: string; fixed: ComponentPrice[]; energy?: ComponentPrice[]; windows?: ProductWindow[] }[];
+  byMunicipality?: boolean | MunicipalitySelection;
+}
+
+export type ProductComponents = Partial<Record<TariffType, ProductYearComponent>>;
+
+/** The municipal fees of one municipality, added to the total of a product. */
+export interface MunicipalityFees {
+  number: number;
+  name: string;
+  tariffs: string[];
+  /** Monthly prices, if any. */
+  fixed: ComponentPrice[];
+  /** The price per kWh if it applies all the time, else windows. */
+  energy?: ComponentPrice[];
+  windows?: ProductWindow[];
+  /** The comments of the utility, such as a cap per year. */
+  comments?: string[];
+}
+
+/** A time window of a product, with the prices of each component and their total. */
+export interface ProductWindow {
+  months: Month[];
+  weekdays: Weekday[];
+  from: string;
+  to: string;
+  [component: string]: string | string[] | ComponentPrice[];
+}
+
+export interface ProductTotal {
+  /** Monthly prices of each component and their total. */
+  fixed: Record<string, ComponentPrice[]>;
+  /** Prices that depend on the time. Without the day prices of the dynamic components. */
+  windows: ProductWindow[];
+  /** Components whose price per kWh changes every day. */
+  dynamic: TariffType[];
+}
+
+/** data/products/<id>/<year>.json: what a customer pays in a year. */
+export interface ProductDocument {
+  $schema?: string;
+  id: string;
+  name: string;
+  year: number;
+  status: Product["status"];
+  default: boolean;
+  selection?: Product["selection"];
+  note?: string;
+  sourceUrl?: string;
+  dsoName: string;
+  dsoNumber: number;
+  pricesExcludeVat: true;
+  total: ProductTotal;
+  /** Slots of electricity, grid, metering and regional_fees without a tariff. */
+  missing: TariffType[];
+  /** The municipal fees per municipality, not in the total. Empty if the product does not list them. */
+  municipalities: MunicipalityFees[];
+  /** The tariffs of the product, as in tariffs/<year>.json, with where each choice comes from. */
+  components: ProductComponents;
+  _meta: {
+    schemaVersion: string;
+    vseVersion: string;
+    generator: { name: string; version: string; url: string };
+    /** The yearly file the components come from. */
+    tariffs: string;
+    /** Day prices of a product with a dynamic component, else null. */
+    days: { latest: string; archive: string } | null;
+    notes: string[];
+  };
 }

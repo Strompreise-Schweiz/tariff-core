@@ -5,7 +5,7 @@ import { applyWaivers, documentIssues, hubIssues, priceDayIssues, schemaIssues }
 import type { Curation, PriceDay, SourceConfig, TariffDocument } from "./core/types.ts";
 import { exists, namesIn, readJson, readJsonIfExists } from "./lib/files.ts";
 import { annotate, NO_UTILITY, parseCli, report } from "./lib/cli.ts";
-import { configPath, dayPath, daysIn, inHub, paths, utilityRoots } from "./lib/repo.ts";
+import { configPath, datesIn, dayPath, daysIn, inHub, paths, utilityRoots } from "./lib/repo.ts";
 
 const USAGE = `
 Validates an org repo or the hub repo: schema checks plus the rules JSON Schema cannot express.
@@ -16,11 +16,35 @@ Usage, from the root of the repo:  node ../tariff-core/engine/validate.ts [--all
   --all-days   check every day file, not only the newest ones
 `;
 
-/** The newest day files and latest.json of a folder under prices/ or products/. */
-function dayFiles(dir: string, allDays: boolean): string[] {
-  const days = daysIn(dir).map((day) => dayPath(dir, day));
-  const latest = path.join(dir, "latest.json");
-  return [...(allDays ? days : days.slice(-3)), ...(exists(latest) ? [latest] : [])];
+/** The newest day files of a folder, sorted by date. */
+function newest(files: string[], allDays: boolean): string[] {
+  return allDays ? files : files.slice(-3);
+}
+
+/** Day files and files with today and tomorrow, under tariffs/ and products/. */
+function dayFiles(root: string, allDays: boolean): string[] {
+  const tariffsDir = paths.tariffs(root);
+  const files: string[] = [];
+  for (const year of namesIn(tariffsDir, /^\d{4}$/)) {
+    for (const tariff of namesIn(path.join(tariffsDir, year), /./)) {
+      const dir = path.join(tariffsDir, year, tariff);
+      files.push(...newest(datesIn(dir).map((day) => path.join(dir, `${day}.json`)), allDays));
+    }
+  }
+  files.push(...namesIn(path.join(tariffsDir, "current"), /\.json$/).map((name) => path.join(tariffsDir, "current", name)));
+  const productsDir = path.join(paths.data(root), "products");
+  for (const id of namesIn(productsDir, /./)) {
+    const dir = path.join(productsDir, id);
+    files.push(...newest(daysIn(dir).map((day) => dayPath(dir, day)), allDays));
+    if (exists(path.join(dir, "latest.json"))) files.push(path.join(dir, "latest.json"));
+  }
+  return files;
+}
+
+/** The yearly files of the products. */
+function productFiles(root: string): string[] {
+  const productsDir = path.join(paths.data(root), "products");
+  return namesIn(productsDir, /./).flatMap((id) => namesIn(path.join(productsDir, id), /^\d{4}\.json$/).map((name) => path.join(productsDir, id, name)));
 }
 
 export function validateUtility(root: string, cwd: string, allDays = false): number {
@@ -46,13 +70,8 @@ export function validateUtility(root: string, cwd: string, allDays = false): num
     errors += report(applyWaivers(issues, waivers), label(file));
   }
 
-  for (const kind of ["prices", "products"]) {
-    for (const id of namesIn(path.join(paths.data(root), kind), /./)) {
-      for (const file of dayFiles(path.join(paths.data(root), kind, id), allDays)) {
-        errors += report(priceDayIssues(path.basename(file), readJson<PriceDay>(file)), label(file));
-      }
-    }
-  }
+  for (const file of productFiles(root)) errors += report(schemaIssues(readJson(file), "product"), label(file));
+  for (const file of dayFiles(root, allDays)) errors += report(priceDayIssues(path.basename(file), readJson<PriceDay>(file)), label(file));
   return errors;
 }
 

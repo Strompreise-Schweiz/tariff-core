@@ -34,11 +34,16 @@
    node ../tariff-core/engine/suggest-products.ts 2026
    ```
 
-   In the hub, run `suggest-products.ts` from `utilities/<slug>/`.
+   In the hub, run `suggest-products.ts` from `utilities/<slug>/`. Mark the standard product of a
+   household with `"default": true`, one per year: what a household in the basic supply gets without
+   choosing anything. `suggest-products.ts` proposes it as `standard` if the utility marks one
+   electricity and one grid tariff with `standardBasegroup`. Each product gets
+   `data/products/<id>/<year>.json` with every component and the total.
 7. For dynamic tariffs, the URL is in `prices.dynamic.url` of the yearly file. Add an entry per tariff
    under `prices` in `config/source.json`, with exactly that `url`: that is how the tariff finds its day
-   prices. Then start "Update prices" by hand under Actions. A product with a dynamic tariff gets a day
-   file per day in `data/products/<id>/`. A utility in the hub that gets day prices moves to an own repo
+   prices. Then start "Update prices" by hand under Actions. The days are published under the tariff in
+   `data/tariffs/<year>/<tariff>/`, and a product with a dynamic tariff gets a day file per day in
+   `data/products/<id>/<year>/`. A utility in the hub that gets day prices moves to an own repo
    first: remove its hub folder, create the repo with the same name and add it to `repositories.json`.
    Its URLs on the own domain stay the same.
 8. Show the VSE conformance badges: in the hub, add a row to the table in its README; in an own repo,

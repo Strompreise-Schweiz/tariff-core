@@ -42,7 +42,7 @@ Unchanged in both: constant prices are one entry with empty `months` and `weekda
   Statistical Office, which no program can convert: the value is kept as published.
 - **Checking:** `build.ts` checks every file against both versions:
 
-  - the files as the utility published them, in `data/sources/tariffs/` or as a hand-written file
+  - the files as the utility published them, in `data/sources/` or as a hand-written file
   - the files of this project, `data/tariffs/<year>.json`
 
 The result is in `data/checks.json` of each utility, and in the badges

@@ -47,20 +47,27 @@ export function inHub(root: string): boolean {
 /**
  * The layout of data/, the same in every utility:
  *
- *     sources/tariffs/<name>.json             yearly file of the utility, unchanged
- *     sources/prices/<id>/<year>/<date>.json  API response, unchanged
- *     tariffs/<year>.json, current.json       yearly file, repaired and corrected
- *     prices/<id>/<year>/<date>.json          day prices of one API, corrected
- *     products/<id>/<year>/<date>.json        every component of a product, per quarter hour
- *     checks.json                             what is wrong with all of the above
+ *     sources/<name>.json                       yearly file of the utility, unchanged
+ *     sources/days/<id>/<year>/<date>.json      response of a day price API, unchanged
+ *     tariffs/<year>.json, current.json         yearly file, repaired and corrected
+ *     tariffs/<year>/<tariff>/<date>.json       day prices of a dynamic tariff of <year>.json, corrected
+ *     tariffs/current/<tariff>.json             today and tomorrow of a dynamic tariff
+ *     products/<id>/<year>.json                 what a customer pays: every component and the total
+ *     products/<id>/<year>/<date>.json          a product with a dynamic tariff: every component per quarter hour
+ *     products/<id>/latest.json                 today and tomorrow of such a product
+ *     checks.json                               what is wrong with all of the above
  */
 export const paths = {
   data: (root: string) => path.join(root, "data"),
-  tariffSource: (root: string, name: string) => path.join(root, "data", "sources", "tariffs", `${name}.json`),
-  priceSources: (root: string, id: string) => path.join(root, "data", "sources", "prices", id),
+  tariffSource: (root: string, name: string) => path.join(root, "data", "sources", `${name}.json`),
+  daySources: (root: string, id: string) => path.join(root, "data", "sources", "days", id),
   tariffs: (root: string) => path.join(root, "data", "tariffs"),
-  prices: (root: string, id: string) => path.join(root, "data", "prices", id),
+  /** The day prices of one dynamic tariff in the yearly file of a year. */
+  tariffDays: (root: string, year: number | string, tariff: string) => path.join(root, "data", "tariffs", String(year), tariff),
+  tariffDay: (root: string, tariff: string, day: string) => path.join(root, "data", "tariffs", day.slice(0, 4), tariff, `${day}.json`),
+  tariffLatest: (root: string, tariff: string) => path.join(root, "data", "tariffs", "current", `${tariff}.json`),
   products: (root: string, id: string) => path.join(root, "data", "products", id),
+  productYear: (root: string, id: string, year: number) => path.join(root, "data", "products", id, `${year}.json`),
   checks: (root: string) => path.join(root, "data", "checks.json"),
 };
 
@@ -69,9 +76,14 @@ export function dayPath(dir: string, day: string): string {
   return path.join(dir, day.slice(0, 4), `${day}.json`);
 }
 
-/** The dates of the day files below a folder, sorted. */
+/** The dates of the day files below a folder of year folders, sorted. */
 export function daysIn(dir: string): string[] {
-  return namesIn(dir, /^\d{4}$/).flatMap((year) => namesIn(path.join(dir, year), /^\d{4}-\d{2}-\d{2}\.json$/)).map((name) => name.slice(0, 10));
+  return namesIn(dir, /^\d{4}$/).flatMap((year) => datesIn(path.join(dir, year)));
+}
+
+/** The dates of the day files directly in a folder, sorted. */
+export function datesIn(dir: string): string[] {
+  return namesIn(dir, /^\d{4}-\d{2}-\d{2}\.json$/).map((name) => name.slice(0, 10));
 }
 
 /** URL of a file in git, relative to the utility root. Works without the own domain. */

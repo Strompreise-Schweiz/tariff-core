@@ -5,6 +5,7 @@
  * No Node APIs: this module also runs in the browser, for example to check a file before upload.
  */
 import { checkDay } from "./price-day.ts";
+import { productTariffIds } from "./product-spec.ts";
 import { schemaIssues } from "./schemas.ts";
 import type { Issue, Month, PriceDay, Severity, SourceConfig, Tariff, TariffDocument, TimePrice, Waiver, Weekday } from "./types.ts";
 
@@ -140,16 +141,21 @@ export function documentIssues(document: TariffDocument, year: number, vseId?: s
       issues.push(issue("warning", "several_standard_tariffs", `${standard.length} ${type} tariffs have standardBasegroup, VSE 1.0.1 allows one`));
     }
   }
+  const defaults = document.products.filter((product) => product.default === true);
+  if (defaults.length > 1) {
+    issues.push(issue("error", "several_default_products", `${defaults.map((p) => p.id).join(", ")} are all marked default, a year has one`));
+  } else if (!defaults.length && document.tariffs.length) {
+    issues.push(issue("warning", "no_default_product", "no product is marked default: which product does a household get without choosing?"));
+  }
   for (const product of document.products) {
     const add = (code: string, message: string) => issues.push(issue("error", code, message, product.id));
     const levels = new Set<number>();
-    for (const [slot, reference] of Object.entries(product.components)) {
-      const target = byId.get(reference);
-      if (!target) add("product_unknown_tariff", `${slot} refers to ${reference}`);
+    for (const { slot, id, option } of productTariffIds(product)) {
+      const target = byId.get(id);
+      if (!target) add("product_unknown_tariff", `${slot} refers to ${id}`);
       else if (target.tariffType !== slot) add("product_wrong_slot", `${slot} refers to a ${target.tariffType} tariff`);
-      if (target?.customerVoltageLevel !== undefined) levels.add(target.customerVoltageLevel);
+      if (!option && target?.customerVoltageLevel !== undefined) levels.add(target.customerVoltageLevel);
     }
-    if (product.status === "verified" && !product.sourceUrl) add("verified_without_source", "a verified product needs sourceUrl");
     if (levels.size > 1) add("product_mixed_voltage", `voltage levels ${[...levels].sort((a, b) => a - b).join(", ")}`);
   }
   return issues;
@@ -163,10 +169,13 @@ export function applyWaivers(issues: Issue[], waivers: Waiver[] = []): Issue[] {
   });
 }
 
-/** Issues of a day file or latest.json under prices/ or products/. fileName is such as 2026-07-02.json. */
+/**
+ * Issues of a day file or of a file with today and tomorrow, under tariffs/ or products/. fileName
+ * is such as 2026-07-02.json for a day; any other name, such as latest.json, is not checked as a day.
+ */
 export function priceDayIssues(fileName: string, document: PriceDay): Issue[] {
   const issues = schemaIssues(document, "price-day");
-  if (issues.length || fileName === "latest.json") return issues;
+  if (issues.length || !/^\d{4}-\d{2}-\d{2}\.json$/.test(fileName)) return issues;
   const check = checkDay(fileName.replace(/\.json$/, ""), document.prices);
   if (check.complete !== document._meta.complete) {
     issues.push(issue("error", "complete_flag_wrong", `${fileName}: ${check.issues.join("; ") || "the day is complete"}`));

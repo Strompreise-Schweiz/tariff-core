@@ -19,8 +19,8 @@ Usage, from the root of an org repo, or of the hub repo for every utility in it:
 
   node ../tariff-core/engine/fetch.ts [--tariffs] [--prices]
 
-  --tariffs   only the yearly files       -> data/sources/tariffs/<name>.json
-  --prices    only the day prices         -> data/sources/prices/<id>/<year>/<date>.json
+  --tariffs   only the yearly files       -> data/sources/<name>.json
+  --prices    only the day prices         -> data/sources/days/<id>/<year>/<date>.json
               (default: both)
 
 Day prices are fetched for the last days, today and tomorrow. Safe to run several times a day: a
@@ -88,7 +88,7 @@ function storeResponse(root: string, source: PriceSource, bytes: Buffer, lastDay
       annotate("warning", `${label} ${day}: kept the complete day, the new response is partial`);
       continue;
     }
-    writeFile(dayPath(paths.priceSources(root, source.id), day), bytes);
+    writeFile(dayPath(paths.daySources(root, source.id), day), bytes);
     console.log(`[${label}] ${day}: ${before ? "changed" : "new"}${fresh.check.complete ? "" : ` (incomplete: ${fresh.check.issues.join("; ")})`}`);
   }
 }

@@ -17,6 +17,14 @@ Every utility has the same four places, in its own repo or in `utilities/<slug>/
 | What is wrong with it? | `data/checks.json` | `build.ts` |
 | What is published? | `data/` | `fetch.ts` and `build.ts` |
 
+`data/` has three levels:
+
+| Folder | Holds |
+|---|---|
+| `data/sources/` | the files of the utility, unchanged: the yearly file, and in `days/` what its day price APIs sent |
+| `data/tariffs/` | the tariffs, repaired to VSE 1.0.1 and corrected: `<year>.json`, and the day prices of each dynamic tariff in `<year>/<tariff>/` |
+| `data/products/` | what a customer pays: `<id>/<year>.json` with every component and the total. The product with `"default": true` is what a household gets without choosing |
+
 ```text
 tariff-core                         hub repo / own repo
   schemas/                         [utilities/<slug>/]config/source.json
@@ -30,7 +38,7 @@ All of it is served under one domain, see [`docs/stable-urls.md`](docs/stable-ur
 | Step | Script | Reads | Writes |
 |---|---|---|---|
 | Download | `engine/fetch.ts` | the URLs in `config/source.json` | `data/sources/`, unchanged |
-| Build | `engine/build.ts` | `data/sources/`, `curation/` | `data/tariffs/`, `data/prices/`, `data/products/`, `data/checks.json`, `data/index.json` |
+| Build | `engine/build.ts` | `data/sources/`, `curation/` | `data/tariffs/`, `data/products/`, `data/checks.json`, `data/index.json` |
 | Check | `engine/validate.ts` | everything | nothing, fails on errors |
 | Site | `engine/build-site.ts` | `data/` | GitHub Pages under `data.strompreise-schweiz.ch` |
 
