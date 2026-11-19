@@ -43,8 +43,8 @@ All of it is served under one domain, see [`docs/stable-urls.md`](docs/stable-ur
 | Site | `engine/build-site.ts` | `data/` | GitHub Pages under `data.strompreise-schweiz.ch` |
 
 The workflow [`reusable-update.yml`](.github/workflows/reusable-update.yml) runs download and build:
-daily in the evening for day prices, weekly for the yearly files, and after every change to
-`curation/` or `config/` without download.
+daily in the evening for day prices, and weekly and after every change to `curation/` or `config/`
+for the yearly files.
 
 ## Documentation
 

@@ -20,8 +20,8 @@ Measured from `retrieved_at` in the archive of version 3.
 
 `update-prices.yml` runs three times per evening in `Europe/Zurich` (`timezone:` key, available since
 March 2026). The runs are idempotent: if the data is there, nothing changes and nothing is committed.
-`update-tariffs.yml` fetches the yearly files weekly, and rebuilds without fetching after a change to
-`curation/` or `config/`.
+`update-tariffs.yml` fetches the yearly files and rebuilds weekly, and also after a change to
+`curation/` or `config/`, so a correction is online within minutes.
 
 The run fails if tomorrow's prices are missing or incomplete after 21:00. GitHub then notifies the person who last changed the schedule, depending on their notification settings.
 Set `alert_after_hour` per price source if a utility publishes later.
