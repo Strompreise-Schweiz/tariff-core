@@ -65,7 +65,7 @@
     </table>
   </div>
   <ul class="legend">
-    <li><b>Standard product:</b> what a household in the basic supply pays without choosing anything, this year, excluding VAT: the monthly fixed prices and the price per kWh of every component together. Each component says where its choice comes from: <code>standardBasegroup</code> (marked by the utility), <code>only</code> (the only tariff of its type), <code>curated</code> (checked by a person) or <code>suggested</code> (not checked). The link opens <code>products/&lt;id&gt;/&lt;year&gt;.json</code> with each component, its options and the municipal fees.</li>
+    <li><b>Standard product:</b> what a household in the basic supply pays without choosing anything, this year, excluding VAT: the monthly fixed prices and the price per kWh of every component together. Below, each component with the tariff in the total, its share of the monthly price and the tariffs a customer may have instead. Each component says where its choice comes from: <code>standardBasegroup</code> (marked by the utility), <code>only</code> (the only tariff of its type), <code>curated</code> (checked by a person) or <code>suggested</code> (not checked). The link opens <code>products/&lt;id&gt;/&lt;year&gt;.json</code> with each component, its options and the municipal fees.</li>
     <li><b>Yearly file:</b> per year whether it is published, and the issues the checks found. A tariff with an error of its own is left out and listed with the reason in <code>checks.json</code>. Errors of the whole file block the year, and the previous file stays online.</li>
     <li><b>VSE:</b> whether a file follows the <a href="https://github.com/Strompreise-Schweiz/tariff-core/tree/main/schemas/vse">OpenAPI definitions of the VSE</a>, version 1.0.0 and 1.0.1. Information only, it does not block publication.</li>
     <li><b>Day prices:</b> per dynamic tariff and per product the days of today and tomorrow and whether each is complete. Today should always be there, tomorrow from the evening on.</li>
@@ -157,10 +157,18 @@ async function productCell(slug, index) {
       doc.total.dynamic.length ? h("span", { class: "label" }, ` plus day prices of ${doc.total.dynamic.join(", ")}`) : null),
     h("div", { class: "line" }, h("span", { class: "label" }, "per month"), fixed !== undefined ? `CHF ${fixed.toFixed(2)}` : "–"),
     doc.municipalities.length ? h("div", { class: "line" }, h("span", { class: "label" }, `plus municipal fees of ${plural(doc.municipalities.length, "municipality").replace("municipalitys", "municipalities")}`)) : null,
-    ...Object.entries(doc.components).filter(([, c]) => c.options?.length).map(([slot, c]) =>
-      h("div", { class: "line" }, h("span", { class: "label" }, `${slot}: ${plural(c.options.length, "option")}`))),
-    h("div", { class: "line" }, ...Object.entries(doc.components).map(([slot, c]) =>
-      chip(c.basis === "suggested" ? "warn" : "ok", `${slot}: ${c.basis}`, c.basis === "suggested" ? "Not checked yet" : "Given or checked"))),
+    ...Object.entries(doc.components).map(([slot, c]) => {
+      const month = value({ total: doc.total.fixed[slot] }, "CHF_m");
+      const options = (c.options ?? []).map((o) => {
+        const m = (o.fixed ?? []).find((p) => p.unit === "CHF_m")?.value;
+        return m !== undefined ? `${o.tariffName} (CHF ${m.toFixed(2)})` : o.tariffName;
+      });
+      return h("div", { class: "line" },
+        chip(c.basis === "suggested" ? "warn" : "ok", `${slot}: ${c.basis}`, c.basis === "suggested" ? "Not checked yet" : "Given or checked"),
+        c.tariff ? c.tariff.tariffName : h("span", { class: "label" }, c.byMunicipality ? "by municipality" : "no tariff"),
+        month !== undefined ? h("span", { class: "label" }, ` · CHF ${month.toFixed(2)} per month`) : null,
+        options.length ? h("span", { class: "where" }, `instead: ${options.join(", ")}`) : null);
+    }),
     doc.missing.length ? h("div", { class: "line" }, chip("warn", `without ${doc.missing.join(", ")}`)) : null);
 }
 
