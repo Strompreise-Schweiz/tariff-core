@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
     steps:
       - name: Checkout calling repository
         uses: actions/checkout@v5
@@ -49,6 +49,18 @@ jobs:
         with:
           path: _site
 
+      # GitHub sometimes lists a just uploaded artifact only seconds later, and the deploy finds
+      # "0 artifacts". Then wait and deploy once more.
       - name: Deploy
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Wait for the artifact to be listed
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - name: Deploy again
+        id: retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
